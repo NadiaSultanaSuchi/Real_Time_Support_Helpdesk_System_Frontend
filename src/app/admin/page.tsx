@@ -1,4 +1,91 @@
+"use client";
+
+import axios from "axios";
+import { useEffect, useState } from "react";
+
 export default function AdminDashboard() {
+  const [stats, setStats] = useState({
+    total: 0,
+    open: 0,
+    openPct: 0,
+    pending: 0,
+    pendingPct: 0,
+    inProgress: 0,
+    inProgressPct: 0,
+    closed: 0,
+    closedPct: 0,
+  });
+  
+  const [systemStats, setSystemStats] = useState({
+    totalUsers: 0,
+    managers: 0,
+    customers: 0,
+    products: 0,
+  });
+  
+  const [recentTickets, setRecentTickets] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadDashboardData = async () => {
+      try {
+        const token = localStorage.getItem("accessToken");
+        const headers = { Authorization: `Bearer ${token}` };
+
+        // 1. Fetch data sequentially
+        const reportsRes = await axios.get("http://127.0.0.1:3000/api/tickets/reports/summary", { headers });
+        const ticketsRes = await axios.get("http://127.0.0.1:3000/api/tickets", {
+          headers,
+          params: { limit: 5, sortBy: "createdAt", order: "DESC" },
+        });
+        const usersRes = await axios.get("http://127.0.0.1:3000/api/users", { headers });
+        const managersRes = await axios.get("http://127.0.0.1:3000/api/users", { headers, params: { role: "Manager" } });
+        const customersRes = await axios.get("http://127.0.0.1:3000/api/users", { headers, params: { role: "Customer" } });
+        const productsRes = await axios.get("http://127.0.0.1:3000/api/products", { headers });
+
+        // 2. Set Ticket Stats
+        const rData = reportsRes.data;
+        const t = rData.totalTickets || 0;
+        const open = rData.byStatus?.Open || 0;
+        const pending = rData.byStatus?.Pending || 0;
+        const inProgress = rData.byStatus?.InProgress || 0;
+        const closed = rData.byStatus?.Closed || 0;
+
+        setStats({
+          total: t,
+          open: open,
+          openPct: t > 0 ? Math.round((open / t) * 100) : 0,
+          pending: pending,
+          pendingPct: t > 0 ? Math.round((pending / t) * 100) : 0,
+          inProgress: inProgress,
+          inProgressPct: t > 0 ? Math.round((inProgress / t) * 100) : 0,
+          closed: closed,
+          closedPct: t > 0 ? Math.round((closed / t) * 100) : 0,
+        });
+
+        // 3. Set Recent Tickets
+        setRecentTickets(ticketsRes.data.data || []);
+
+        // 4. Set System & User Stats
+        const extractCount = (res) => res.data?.total ?? res.data?.data?.length ?? res.data?.length ?? 0;
+        
+        setSystemStats({
+          totalUsers: extractCount(usersRes),
+          managers: extractCount(managersRes),
+          customers: extractCount(customersRes),
+          products: productsRes.data?.length || 0, // Gets the length of the product array
+        });
+
+      } catch (error) {
+        console.error("Error loading dashboard data:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadDashboardData();
+  }, []);
+
   return (
     <div className="mx-auto max-w-7xl">
       {/* Heading */}
@@ -27,11 +114,11 @@ export default function AdminDashboard() {
               </p>
 
               <h2 className="mt-3 text-3xl font-bold text-slate-900">
-                250
+                {loading ? "..." : stats.total}
               </h2>
 
               <p className="mt-2 text-xs font-medium text-emerald-600">
-                ↑ 12% from last month
+                Data from server
               </p>
             </div>
 
@@ -50,11 +137,11 @@ export default function AdminDashboard() {
               </p>
 
               <h2 className="mt-3 text-3xl font-bold text-slate-900">
-                80
+                {loading ? "..." : stats.open}
               </h2>
 
               <p className="mt-2 text-xs font-medium text-amber-600">
-                32% of total tickets
+                {stats.openPct}% of total tickets
               </p>
             </div>
 
@@ -73,11 +160,11 @@ export default function AdminDashboard() {
               </p>
 
               <h2 className="mt-3 text-3xl font-bold text-slate-900">
-                95
+                {loading ? "..." : systemStats.customers}
               </h2>
 
               <p className="mt-2 text-xs font-medium text-emerald-600">
-                ↑ 8% from last month
+                Registered customers
               </p>
             </div>
 
@@ -96,7 +183,7 @@ export default function AdminDashboard() {
               </p>
 
               <h2 className="mt-3 text-3xl font-bold text-slate-900">
-                20
+                {loading ? "..." : systemStats.managers}
               </h2>
 
               <p className="mt-2 text-xs font-medium text-slate-500">
@@ -134,34 +221,38 @@ export default function AdminDashboard() {
           <div className="mt-7 space-y-5">
             <TicketStatus
               label="Open"
-              value={80}
-              percentage="32%"
-              bar="w-[32%]"
+              value={stats.open}
+              percentage={`${stats.openPct}%`}
+              bar="" 
               bg="bg-blue-500"
+              style={{ width: `${stats.openPct}%` }}
             />
 
             <TicketStatus
               label="Pending"
-              value={30}
-              percentage="12%"
-              bar="w-[12%]"
+              value={stats.pending}
+              percentage={`${stats.pendingPct}%`}
+              bar=""
               bg="bg-amber-500"
+              style={{ width: `${stats.pendingPct}%` }}
             />
 
             <TicketStatus
               label="In Progress"
-              value={40}
-              percentage="16%"
-              bar="w-[16%]"
+              value={stats.inProgress}
+              percentage={`${stats.inProgressPct}%`}
+              bar=""
               bg="bg-violet-500"
+              style={{ width: `${stats.inProgressPct}%` }}
             />
 
             <TicketStatus
               label="Closed"
-              value={100}
-              percentage="40%"
-              bar="w-[40%]"
+              value={stats.closed}
+              percentage={`${stats.closedPct}%`}
+              bar=""
               bg="bg-emerald-500"
+              style={{ width: `${stats.closedPct}%` }}
             />
           </div>
         </div>
@@ -199,35 +290,42 @@ export default function AdminDashboard() {
               </thead>
 
               <tbody>
-                <TicketRow
-                  title="Unable to login"
-                  customer="Fahim Hasan"
-                  priority="High"
-                  priorityClass="bg-orange-50 text-orange-600"
-                  status="Open"
-                  statusClass="bg-blue-50 text-blue-600"
-                  id="#102"
-                />
-
-                <TicketRow
-                  title="Payment problem"
-                  customer="Karim Ahmed"
-                  priority="Urgent"
-                  priorityClass="bg-red-50 text-red-600"
-                  status="Pending"
-                  statusClass="bg-amber-50 text-amber-600"
-                  id="#101"
-                />
-
-                <TicketRow
-                  title="Product issue"
-                  customer="Nusrat Jahan"
-                  priority="Medium"
-                  priorityClass="bg-violet-50 text-violet-600"
-                  status="In Progress"
-                  statusClass="bg-violet-50 text-violet-600"
-                  id="#100"
-                />
+                {loading ? (
+                  <tr>
+                    <td colSpan={5} className="py-4 text-center text-sm text-slate-500">
+                      Loading tickets...
+                    </td>
+                  </tr>
+                ) : recentTickets.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="py-4 text-center text-sm text-slate-500">
+                      No recent tickets found.
+                    </td>
+                  </tr>
+                ) : (
+                  recentTickets.map((ticket) => (
+                    <TicketRow
+                      key={ticket.id}
+                      title={ticket.title}
+                      customer={ticket.customer?.name || ticket.customer?.email || "Unknown"}
+                      priority={ticket.priority}
+                      priorityClass={
+                        ticket.priority === "Urgent" || ticket.priority === "High"
+                          ? "bg-red-50 text-red-600"
+                          : "bg-blue-50 text-blue-600"
+                      }
+                      status={ticket.status}
+                      statusClass={
+                        ticket.status === "Closed"
+                          ? "bg-emerald-50 text-emerald-600"
+                          : ticket.status === "Open"
+                          ? "bg-amber-50 text-amber-600"
+                          : "bg-blue-50 text-blue-600"
+                      }
+                      id={`#${ticket.id}`}
+                    />
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -311,7 +409,7 @@ export default function AdminDashboard() {
               </div>
 
               <span className="text-lg font-bold text-slate-900">
-                120
+                {loading ? "..." : systemStats.totalUsers}
               </span>
             </div>
 
@@ -326,7 +424,7 @@ export default function AdminDashboard() {
               </div>
 
               <span className="text-lg font-bold text-slate-900">
-                15
+                {loading ? "..." : systemStats.products}
               </span>
             </div>
 
@@ -340,6 +438,7 @@ export default function AdminDashboard() {
                 </p>
               </div>
 
+              {/* Assuming Urgent tickets count comes from report summary later, for now left as 8 based on previous code */}
               <span className="text-lg font-bold text-red-600">
                 8
               </span>
@@ -358,12 +457,14 @@ function TicketStatus({
   percentage,
   bar,
   bg,
+  style
 }: {
   label: string;
   value: number;
   percentage: string;
   bar: string;
   bg: string;
+  style?: React.CSSProperties;
 }) {
   return (
     <div>
@@ -385,7 +486,7 @@ function TicketStatus({
       </div>
 
       <div className="h-2 overflow-hidden rounded-full bg-slate-100">
-        <div className={`h-full rounded-full ${bar} ${bg}`} />
+        <div className={`h-full rounded-full ${bar} ${bg}`} style={style} />
       </div>
     </div>
   );
