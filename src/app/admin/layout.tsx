@@ -110,6 +110,16 @@ export default function AdminLayout({
               Users
             </Link>
 
+
+            <Link
+              href="/admin/managers/requests"
+              className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-slate-300 transition hover:bg-slate-800 hover:text-white"
+            >
+              <span className="text-lg">🙏🥺</span>
+              Manager Requests
+            </Link>
+
+
             <Link
               href="/admin/products"
               className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-slate-300 transition hover:bg-slate-800 hover:text-white"
