@@ -366,7 +366,7 @@ export default function AdminDashboard() {
             </a>
 
             <a
-              href="/admin/managers/pending"
+              href="/admin/managers/requests"
               className="rounded-xl border border-slate-200 p-4 transition hover:border-blue-200 hover:bg-blue-50"
             >
               <div className="text-lg text-blue-600">♙</div>
