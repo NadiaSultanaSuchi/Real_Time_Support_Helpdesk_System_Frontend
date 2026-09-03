@@ -45,6 +45,7 @@ export default function LoginPage() {
 
       // Redirect according to role
       if (role === "Admin") {
+        console.log("successsssssssss"); //debugggggggggggggggg
         router.push("/admin");
       } else if (role === "Manager") {
         router.push("/manager");
@@ -55,6 +56,7 @@ export default function LoginPage() {
       }
     } catch (error) {
       if (axios.isAxiosError(error)) {
+        console.log("hereeeeeeeeeeeeeeeeee"); //debugggggggggggggggg
         setError(
           error.response?.data?.message ||
             "Invalid email or password."
