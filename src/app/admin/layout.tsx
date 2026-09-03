@@ -1,10 +1,55 @@
+"use client";
+
 import Link from "next/link";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 export default function AdminLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const router = useRouter();
+
+  const [authorized, setAuthorized] = useState(false);
+
+  useEffect(() => {
+    const accessToken = localStorage.getItem("accessToken");
+
+    // No access token
+    if (!accessToken) {
+      router.replace("/login");
+      return;
+    }
+
+    try {
+      // Decode JWT payload
+      const payload = JSON.parse(
+        atob(accessToken.split(".")[1])
+      );
+
+      // Check admin role
+      if (payload.role !== "Admin") {
+        router.replace("/login");
+        return;
+      }
+
+      // Token exists and user is Admin
+      setAuthorized(true);
+    } catch {
+      // Invalid token
+      localStorage.removeItem("accessToken");
+      localStorage.removeItem("refreshToken");
+
+      router.replace("/login");
+    }
+  }, [router]);
+
+  // Don't show the admin dashboard until authentication is checked
+  if (!authorized) {
+    return null;
+  }
+
   return (
     <div className="min-h-screen bg-slate-50">
       {/* Sidebar */}
@@ -20,6 +65,7 @@ export default function AdminLayout({
               <h1 className="font-semibold tracking-tight">
                 SupportDesk
               </h1>
+
               <p className="text-xs text-slate-400">
                 Administration
               </p>
@@ -55,7 +101,7 @@ export default function AdminLayout({
               <span className="text-lg">▤</span>
               Tickets
             </Link>
-            
+
             <Link
               href="/admin/users"
               className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-slate-300 transition hover:bg-slate-800 hover:text-white"
@@ -105,6 +151,7 @@ export default function AdminLayout({
               <p className="truncate text-sm font-medium">
                 Administrator
               </p>
+
               <p className="truncate text-xs text-slate-500">
                 Admin account
               </p>
@@ -121,6 +168,7 @@ export default function AdminLayout({
             <p className="text-sm text-slate-500">
               Welcome back
             </p>
+
             <h2 className="text-lg font-semibold text-slate-900">
               Administrator
             </h2>
@@ -144,6 +192,7 @@ export default function AdminLayout({
                 <p className="text-sm font-medium text-slate-900">
                   Admin
                 </p>
+
                 <p className="text-xs text-slate-500">
                   Administrator
                 </p>
@@ -153,7 +202,9 @@ export default function AdminLayout({
         </header>
 
         {/* Content */}
-        <main className="p-8">{children}</main>
+        <main className="p-8">
+          {children}
+        </main>
       </div>
     </div>
   );

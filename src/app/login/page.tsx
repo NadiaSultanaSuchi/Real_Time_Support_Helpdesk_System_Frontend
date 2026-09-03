@@ -45,7 +45,6 @@ export default function LoginPage() {
 
       // Redirect according to role
       if (role === "Admin") {
-        console.log("successsssssssss"); //debugggggggggggggggg
         router.push("/admin");
       } else if (role === "Manager") {
         router.push("/manager");
