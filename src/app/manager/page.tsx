@@ -3,8 +3,7 @@
 import axios from 'axios';
 import { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 export default function ManagerDashboard() {
 
@@ -33,7 +32,7 @@ export default function ManagerDashboard() {
     })
 
     const [loading, setLoading] = useState(true);
-    const [errorMessage, setErrorMessage] = useState(null); // Nadia
+    const [errorMessage, setErrorMessage] = useState(null);
 
     useEffect(() => {
 
@@ -45,8 +44,6 @@ export default function ManagerDashboard() {
                 const response = await axios.get("http://localhost:3000/api/dashboard/manager", {
                     headers: { Authorization: `Bearer ${token}` }
                 });
-
-                console.log(response.data);
 
                 setProfile(response.data.profile);
                 setStats(response.data.stats);
@@ -60,12 +57,9 @@ export default function ManagerDashboard() {
                 setLoading(false);
             }
             catch (error) {
-            
                 if (error.response) {
-                    console.log(error.response.data);
                     setErrorMessage(error.response.data?.error || "Could not load dashboard");
                 } else {
-                    console.log(error.message);
                     setErrorMessage("Could not reach the server. Is the backend running?");
                 }
                 setLoading(false);
