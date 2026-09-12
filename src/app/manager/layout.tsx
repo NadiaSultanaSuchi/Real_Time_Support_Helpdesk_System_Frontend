@@ -8,6 +8,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
 
 export default function ManagerLayout({ children }) {
 
@@ -34,7 +35,6 @@ export default function ManagerLayout({ children }) {
             const decoded = jwtDecode(token);
             console.log(decoded);
 
-        
             if (decoded.role != "Manager") {
                 console.log("not a manager, redirecting");
                 router.push("/login");
@@ -77,18 +77,22 @@ export default function ManagerLayout({ children }) {
 
                 <nav className="flex-1 px-4 py-6 space-y-1">
                     {navItems.map((item) => (
-                        <Button
+                        // Nadia — asChild + Slot wasn't working with this
+                        // project's Button component, so instead of wrapping
+                        // Link in Button, we style the Link directly to look
+                        // like one (same visual result, no Slot dependency).
+                        <Link
                             key={item.href}
-                            asChild
-                            variant={pathname === item.href ? "default" : "ghost"}
-                            className={
+                            href={item.href}
+                            className={cn(
+                                "flex w-full items-center rounded-xl px-3 py-3 text-sm transition-colors",
                                 pathname === item.href
-                                    ? "w-full justify-start bg-blue-600 text-white hover:bg-blue-600"
-                                    : "w-full justify-start text-slate-300 hover:bg-slate-800 hover:text-white"
-                            }
+                                    ? "bg-blue-600 text-white"
+                                    : "text-slate-300 hover:bg-slate-800 hover:text-white"
+                            )}
                         >
-                            <Link href={item.href}>{item.label}</Link>
-                        </Button>
+                            {item.label}
+                        </Link>
                     ))}
                 </nav>
 
