@@ -128,13 +128,13 @@ export default function AdminLayout({
               Products
             </Link>
 
-            <Link
+            {/* <Link
               href="/admin/reports"
               className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-slate-300 transition hover:bg-slate-800 hover:text-white"
             >
               <span className="text-lg">◫</span>
               Reports
-            </Link>
+            </Link> */}
           </div>
 
           <p className="mb-3 mt-8 px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
