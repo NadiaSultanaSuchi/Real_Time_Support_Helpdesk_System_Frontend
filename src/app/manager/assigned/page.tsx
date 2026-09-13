@@ -6,7 +6,6 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useSearchParams } from "next/navigation";
 import {
     Table,
     TableHeader,
@@ -21,13 +20,6 @@ import {
     SheetHeader,
     SheetTitle,
 } from "@/components/ui/sheet";
-import {
-    Select,
-    SelectTrigger,
-    SelectValue,
-    SelectContent,
-    SelectItem,
-} from "@/components/ui/select";
 
 function statusColor(status) {
     if (status === "Resolved") return "bg-green-100 text-green-700";
@@ -43,6 +35,8 @@ function priorityColor(priority) {
     return "bg-slate-100 text-slate-600"; // Low
 }
 
+const STATUS_OPTIONS = ["Open", "InProgress", "Resolved", "Closed"];
+
 export default function AssignedTicketsPage() {
 
     const [totalAssigned, setTotalAssigned] = useState(0);
@@ -53,23 +47,19 @@ export default function AssignedTicketsPage() {
     const [loading, setLoading] = useState(true);
     const [errorMessage, setErrorMessage] = useState(null);
 
-    const [actingOnId, setActingOnId] = useState(null);
-
     const [sheetOpen, setSheetOpen] = useState(false);
     const [selectedTicket, setSelectedTicket] = useState(null);
     const [detailLoading, setDetailLoading] = useState(false);
-    const [statusUpdating, setStatusUpdating] = useState(false);
+    const [saving, setSaving] = useState(false);
     const [pendingStatus, setPendingStatus] = useState("");
+    const [pendingAssigneeId, setPendingAssigneeId] = useState(null);
 
-    const [transferring, setTransferring] = useState(false);
     const [transferQuery, setTransferQuery] = useState("");
     const [showSuggestions, setShowSuggestions] = useState(false);
 
     const [comments, setComments] = useState([]);
     const [commentText, setCommentText] = useState("");
     const [postingComment, setPostingComment] = useState(false);
-    const searchParams = useSearchParams();
-const searchQuery = searchParams.get("q")?.toLowerCase() ?? "";
 
     const token = typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
 
@@ -112,6 +102,7 @@ const searchQuery = searchParams.get("q")?.toLowerCase() ?? "";
         setCommentText("");
         setTransferQuery("");
         setShowSuggestions(false);
+        setPendingAssigneeId(null);
 
         try {
             const response = await axios.get(`http://localhost:3000/api/tickets/${ticketId}`, {
@@ -134,44 +125,46 @@ const searchQuery = searchParams.get("q")?.toLowerCase() ?? "";
         }
     }
 
-    const handleStatusChange = async () => {
-        setStatusUpdating(true);
-        try {
-            const response = await axios.patch(
-                `http://localhost:3000/api/tickets/${selectedTicket.id}/status`,
-                { status: pendingStatus },
-                { headers: { Authorization: `Bearer ${token}` } }
-            );
-            setSelectedTicket(response.data);
-            await loadAssignedTickets();
-            alert("Status updated.");
-        }
-        catch (error) {
-            alert(error.response?.data?.error || "Could not update status");
-        }
-        finally {
-            setStatusUpdating(false);
-        }
+    const handlePickTeammate = (member) => {
+        setPendingAssigneeId(member.id);
+        setTransferQuery(member.name || member.email);
+        setShowSuggestions(false);
     }
 
-    const handleTransfer = async (assigneeId) => {
-        setTransferring(true);
+    // One button at the bottom saves everything that changed —
+    // status, and/or a teammate transfer, in one go.
+    const handleSaveAll = async () => {
+        const statusChanged = pendingStatus !== selectedTicket.status;
+        const transferChosen = pendingAssigneeId !== null;
+
+        if (!statusChanged && !transferChosen) return;
+
+        setSaving(true);
         try {
-            await axios.patch(
-                `http://localhost:3000/api/tickets/${selectedTicket.id}/assign`,
-                { assigneeId: Number(assigneeId) },
-                { headers: { Authorization: `Bearer ${token}` } }
-            );
-            setSheetOpen(false);
-            setTransferQuery("");
-            setShowSuggestions(false);
+            if (statusChanged) {
+                await axios.patch(
+                    `http://localhost:3000/api/tickets/${selectedTicket.id}/status`,
+                    { status: pendingStatus },
+                    { headers: { Authorization: `Bearer ${token}` } }
+                );
+            }
+
+            if (transferChosen) {
+                await axios.patch(
+                    `http://localhost:3000/api/tickets/${selectedTicket.id}/assign`,
+                    { assigneeId: Number(pendingAssigneeId) },
+                    { headers: { Authorization: `Bearer ${token}` } }
+                );
+            }
+
             await loadAssignedTickets();
+            setSheetOpen(false);
         }
         catch (error) {
-            alert(error.response?.data?.error || "Could not transfer ticket");
+            alert(error.response?.data?.error || "Could not save changes");
         }
         finally {
-            setTransferring(false);
+            setSaving(false);
         }
     }
 
@@ -196,38 +189,6 @@ const searchQuery = searchParams.get("q")?.toLowerCase() ?? "";
         }
     }
 
-    const handleEscalate = async (ticketId) => {
-        setActingOnId(ticketId);
-        try {
-            await axios.patch(`http://localhost:3000/api/tickets/${ticketId}/escalate`, {}, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
-            await loadAssignedTickets();
-        }
-        catch (error) {
-            alert(error.response?.data?.error || "Could not escalate ticket");
-        }
-        finally {
-            setActingOnId(null);
-        }
-    }
-
-    const handleClose = async (ticketId) => {
-        setActingOnId(ticketId);
-        try {
-            await axios.patch(`http://localhost:3000/api/tickets/${ticketId}/close`, {}, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
-            await loadAssignedTickets();
-        }
-        catch (error) {
-            alert(error.response?.data?.error || "Could not close ticket");
-        }
-        finally {
-            setActingOnId(null);
-        }
-    }
-
     if (loading) {
         return <p>Loading...</p>
     }
@@ -241,6 +202,10 @@ const searchQuery = searchParams.get("q")?.toLowerCase() ?? "";
         .filter((member) =>
             (member.name || member.email).toLowerCase().includes(transferQuery.toLowerCase())
         );
+
+    const hasUnsavedChanges =
+        selectedTicket &&
+        (pendingStatus !== selectedTicket.status || pendingAssigneeId !== null);
 
     return (
         <div>
@@ -298,7 +263,6 @@ const searchQuery = searchParams.get("q")?.toLowerCase() ?? "";
                                     <TableHead>Customer</TableHead>
                                     <TableHead>Status</TableHead>
                                     <TableHead>Priority</TableHead>
-                                    <TableHead>Actions</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -317,26 +281,6 @@ const searchQuery = searchParams.get("q")?.toLowerCase() ?? "";
                                         <TableCell>
                                             <Badge className={priorityColor(ticket.priority)}>{ticket.priority}</Badge>
                                         </TableCell>
-                                        <TableCell onClick={(e) => e.stopPropagation()}>
-                                            <div className="flex gap-2">
-                                                <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    onClick={() => handleEscalate(ticket.id)}
-                                                    disabled={actingOnId === ticket.id || ticket.priority === "Urgent"}
-                                                >
-                                                    Escalate
-                                                </Button>
-                                                <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    onClick={() => handleClose(ticket.id)}
-                                                    disabled={actingOnId === ticket.id || ticket.status === "Closed"}
-                                                >
-                                                    Close
-                                                </Button>
-                                            </div>
-                                        </TableCell>
                                     </TableRow>
                                 ))}
                             </TableBody>
@@ -347,12 +291,12 @@ const searchQuery = searchParams.get("q")?.toLowerCase() ?? "";
             </Card>
 
             <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-                <SheetContent>
+                <SheetContent className="flex flex-col">
                     <SheetHeader>
                         <SheetTitle>Ticket Details</SheetTitle>
                     </SheetHeader>
 
-                    <div className="px-4">
+                    <div className="px-4 flex-1 overflow-y-auto">
                         {detailLoading ? (
                             <p>Loading...</p>
                         ) : !selectedTicket ? (
@@ -372,34 +316,25 @@ const searchQuery = searchParams.get("q")?.toLowerCase() ?? "";
 
                                 <div>
                                     <p className="text-sm text-slate-500 mb-1">Status</p>
-                                    <div className="flex items-center gap-2">
-                                        <Select
-                                            value={pendingStatus}
-                                            onValueChange={setPendingStatus}
-                                            disabled={statusUpdating}
-                                        >
-                                            <SelectTrigger className="w-[160px]">
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="Open">Open</SelectItem>
-                                                <SelectItem value="InProgress">In Progress</SelectItem>
-                                                <SelectItem value="Resolved">Resolved</SelectItem>
-                                                <SelectItem value="Closed">Closed</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-
+                                    <div className="flex flex-wrap gap-2">
+                                        {STATUS_OPTIONS.map((option) => (
+                                            <button
+                                                key={option}
+                                                type="button"
+                                                onClick={() => setPendingStatus(option)}
+                                                className={
+                                                    pendingStatus === option
+                                                        ? "rounded-md px-3 py-1.5 text-xs font-medium bg-violet-700 text-white"
+                                                        : "rounded-md px-3 py-1.5 text-xs font-medium border border-slate-200 text-slate-600 hover:bg-slate-50"
+                                                }
+                                            >
+                                                {option === "InProgress" ? "In Progress" : option}
+                                            </button>
+                                        ))}
+                                    </div>
+                                    <div className="mt-2">
                                         <Badge className={priorityColor(selectedTicket.priority)}>{selectedTicket.priority}</Badge>
                                     </div>
-
-                                    <Button
-                                        size="sm"
-                                        className="mt-2"
-                                        onClick={handleStatusChange}
-                                        disabled={statusUpdating || pendingStatus === selectedTicket.status}
-                                    >
-                                        Save Status
-                                    </Button>
                                 </div>
 
                                 <div>
@@ -426,11 +361,11 @@ const searchQuery = searchParams.get("q")?.toLowerCase() ?? "";
                                         value={transferQuery}
                                         onChange={(e) => {
                                             setTransferQuery(e.target.value);
+                                            setPendingAssigneeId(null);
                                             setShowSuggestions(true);
                                         }}
                                         onFocus={() => setShowSuggestions(true)}
                                         placeholder="Type a name..."
-                                        disabled={transferring}
                                     />
 
                                     {showSuggestions && transferQuery.trim() !== "" && (
@@ -443,17 +378,17 @@ const searchQuery = searchParams.get("q")?.toLowerCase() ?? "";
                                                         key={member.id}
                                                         type="button"
                                                         className="block w-full px-3 py-2 text-left text-sm hover:bg-slate-50"
-                                                        onClick={() => {
-                                                            setTransferQuery(member.name || member.email);
-                                                            setShowSuggestions(false);
-                                                            handleTransfer(member.id);
-                                                        }}
+                                                        onClick={() => handlePickTeammate(member)}
                                                     >
                                                         {member.name || member.email} — {member.assignedTickets} assigned
                                                     </button>
                                                 ))
                                             )}
                                         </div>
+                                    )}
+
+                                    {pendingAssigneeId !== null && (
+                                        <p className="mt-1 text-xs text-violet-700">Will transfer on save ✓</p>
                                     )}
                                 </div>
 
@@ -490,6 +425,19 @@ const searchQuery = searchParams.get("q")?.toLowerCase() ?? "";
                             </div>
                         )}
                     </div>
+
+                    {selectedTicket && (
+                        <div className="border-t p-4">
+                            <button
+                                type="button"
+                                onClick={handleSaveAll}
+                                disabled={saving || !hasUnsavedChanges}
+                                className="w-full rounded-md bg-violet-800 py-2.5 text-sm font-semibold text-white hover:bg-violet-900 disabled:opacity-40 disabled:cursor-not-allowed"
+                            >
+                                {saving ? "Saving..." : "Save Changes"}
+                            </button>
+                        </div>
+                    )}
                 </SheetContent>
             </Sheet>
 

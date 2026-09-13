@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
     Table,
     TableHeader,
@@ -13,7 +14,7 @@ import {
     TableHead,
     TableCell,
 } from "@/components/ui/table";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 function statusColor(status) {
     if (status === "Resolved") return "bg-green-100 text-green-700";
@@ -30,8 +31,6 @@ function averageRating(tickets) {
 }
 
 // Simple, rule-based flagging — NOT real AI/ML.
-// Just checks a few patterns that could suggest spam/abuse,
-// so a manager can look closer, not to auto-ban anyone.
 function checkSuspicious(tickets) {
     const reasons = [];
 
@@ -72,6 +71,12 @@ export default function CustomersPage() {
     const [loading, setLoading] = useState(true);
     const [errorMessage, setErrorMessage] = useState(null);
 
+    const [openNotesTicketId, setOpenNotesTicketId] = useState(null);
+    const [comments, setComments] = useState([]);
+    const [commentsLoading, setCommentsLoading] = useState(false);
+    const [commentText, setCommentText] = useState("");
+    const [postingComment, setPostingComment] = useState(false);
+
     const token = typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
 
     useEffect(() => {
@@ -110,6 +115,70 @@ export default function CustomersPage() {
         return tickets.filter((t) => t.customer?.id === customerId);
     }
 
+    const handleToggleNotes = async (ticketId) => {
+        if (openNotesTicketId === ticketId) {
+            setOpenNotesTicketId(null);
+            return;
+        }
+
+        setOpenNotesTicketId(ticketId);
+        setCommentText("");
+        setCommentsLoading(true);
+        try {
+            const response = await axios.get(`http://localhost:3000/api/tickets/${ticketId}/comments`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setComments(response.data);
+        }
+        catch (error) {
+            alert(error.response?.data?.error || "Could not load notes");
+            setOpenNotesTicketId(null);
+        }
+        finally {
+            setCommentsLoading(false);
+        }
+    }
+
+    const handlePostComment = async () => {
+        if (!commentText.trim()) return;
+
+        setPostingComment(true);
+        try {
+            const response = await axios.post(
+                `http://localhost:3000/api/tickets/${openNotesTicketId}/comments`,
+                { content: commentText },
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
+            setComments((prev) => [...prev, response.data]);
+            setCommentText("");
+        }
+        catch (error) {
+            alert(error.response?.data?.error || "Could not post note");
+        }
+        finally {
+            setPostingComment(false);
+        }
+    }
+
+    const handleReportCustomer = async (customer, reasons) => {
+    const extra = window.prompt(
+        `Report ${customer.name || customer.email} to Admin?\n\nAuto-detected: ${reasons.join(", ")}\n\nAdd a note (optional):`
+    );
+    if (extra === null) return; // cancelled
+
+    try {
+        await axios.patch(
+            `http://localhost:3000/api/users/customers/${customer.id}/report`,
+            { reason: `${reasons.join(", ")}${extra ? " — " + extra : ""}` },
+            { headers: { Authorization: `Bearer ${token}` } }
+        );
+        alert("Reported to Admin.");
+    }
+    catch (error) {
+        alert(error.response?.data?.error || "Could not send report");
+    }
+}
+
     if (loading) {
         return <p>Loading...</p>
     }
@@ -120,32 +189,38 @@ export default function CustomersPage() {
 
     const selectedCustomer = customers.find((c) => c.id === selectedId);
 
-    const satisfactionData = customers
-        .map((c) => ({
-            name: c.name || c.email,
-            satisfaction: averageRating(ticketsFor(c.id)),
-        }))
-        .filter((row) => row.satisfaction !== null);
+    const suspiciousCount = customers.filter(
+        (c) => checkSuspicious(ticketsFor(c.id)).length > 0
+    ).length;
+    const normalCount = customers.length - suspiciousCount;
+
+    const fraudCheckData = [
+        { name: "Normal", count: normalCount },
+        { name: "Suspicious", count: suspiciousCount },
+    ];
 
     return (
         <div>
 
             <h1 className="text-3xl font-bold">CUSTOMERS</h1><br />
 
-            {satisfactionData.length > 0 && (
+            {customers.length > 0 && (
                 <>
                     <Card>
                         <CardHeader>
-                            <CardTitle>Customer Satisfaction</CardTitle>
+                            <CardTitle>Fraud Check Overview</CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <ResponsiveContainer width="100%" height={220}>
-                                <BarChart data={satisfactionData}>
-                                    <CartesianGrid strokeDasharray="3 3" />
-                                    <XAxis dataKey="name" />
-                                    <YAxis domain={[0, 5]} />
+                            <ResponsiveContainer width="100%" height={140}>
+                                <BarChart data={fraudCheckData} layout="vertical">
+                                    <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                                    <XAxis type="number" allowDecimals={false} />
+                                    <YAxis type="category" dataKey="name" width={80} />
                                     <Tooltip />
-                                    <Bar dataKey="satisfaction" fill="#f59e0b" />
+                                    <Bar dataKey="count" radius={[0, 4, 4, 0]}>
+                                        <Cell fill="#22c55e" />
+                                        <Cell fill="#ef4444" />
+                                    </Bar>
                                 </BarChart>
                             </ResponsiveContainer>
                         </CardContent>
@@ -204,18 +279,28 @@ export default function CustomersPage() {
                                                         <span>⭐ {avg} / 5</span>
                                                     )}
                                                 </TableCell>
-                                                <TableCell>
-                                                    {suspiciousReasons.length === 0 ? (
-                                                        <span className="text-slate-300">—</span>
-                                                    ) : (
-                                                        <Badge
-                                                            className="bg-red-100 text-red-700"
-                                                            title={suspiciousReasons.join(", ")}
-                                                        >
-                                                            ⚠ Suspicious
-                                                        </Badge>
-                                                    )}
-                                                </TableCell>
+                                               <TableCell>
+    {suspiciousReasons.length === 0 ? (
+        <span className="text-slate-300">—</span>
+    ) : (
+        <div className="flex items-center gap-2">
+            <Badge
+                className="bg-red-100 text-red-700"
+                title={suspiciousReasons.join(", ")}
+            >
+                ⚠ Suspicious
+            </Badge>
+            <Button
+                variant="outline"
+                size="sm"
+                className="h-6 px-2 text-xs"
+                onClick={() => handleReportCustomer(customer, suspiciousReasons)}
+            >
+                Report
+            </Button>
+        </div>
+    )}
+</TableCell>
                                             </TableRow>
                                         );
                                     })}
@@ -235,7 +320,7 @@ export default function CustomersPage() {
                     <CardContent>
 
                         {!selectedCustomer ? (
-                            <p className="text-sm text-slate-500">Click "N ticket(s)" on the left to see details.</p>
+                            <p className="text-sm text-slate-500">Click ticket ...see details.</p>
                         ) : (
                             <>
                                 {checkSuspicious(ticketsFor(selectedCustomer.id)).length > 0 && (
@@ -260,6 +345,50 @@ export default function CustomersPage() {
                                                 <span className="ml-2 text-sm text-slate-500">
                                                     {ticket.rating != null ? `⭐ ${ticket.rating}/5` : "Not rated"}
                                                 </span>
+
+                                                <div>
+                                                    <button
+                                                        type="button"
+                                                        className="mt-1 text-xs text-blue-600 hover:underline"
+                                                        onClick={() => handleToggleNotes(ticket.id)}
+                                                    >
+                                                        {openNotesTicketId === ticket.id ? "Hide notes" : "View / add notes"}
+                                                    </button>
+                                                </div>
+
+                                                {openNotesTicketId === ticket.id && (
+                                                    <div className="mt-2 rounded-md border bg-slate-50 p-2">
+                                                        {commentsLoading ? (
+                                                            <p className="text-xs text-slate-400">Loading notes...</p>
+                                                        ) : (
+                                                            <div className="space-y-2 max-h-[140px] overflow-y-auto">
+                                                                {comments.length === 0 ? (
+                                                                    <p className="text-xs text-slate-400">No notes yet</p>
+                                                                ) : (
+                                                                    comments.map((c) => (
+                                                                        <div key={c.id} className="text-xs border-b border-slate-200 pb-1">
+                                                                            <p className="font-medium text-slate-700">{c.author?.name || c.author?.email}</p>
+                                                                            <p className="text-slate-600">{c.content}</p>
+                                                                        </div>
+                                                                    ))
+                                                                )}
+                                                            </div>
+                                                        )}
+
+                                                        <div className="mt-2 flex gap-2">
+                                                            <Input
+                                                                value={commentText}
+                                                                onChange={(e) => setCommentText(e.target.value)}
+                                                                placeholder="Leave a note..."
+                                                                className="h-8 text-xs"
+                                                                onKeyDown={(e) => { if (e.key === "Enter") handlePostComment(); }}
+                                                            />
+                                                            <Button size="sm" onClick={handlePostComment} disabled={postingComment}>
+                                                                Post
+                                                            </Button>
+                                                        </div>
+                                                    </div>
+                                                )}
                                             </div>
                                         ))}
                                     </div>
