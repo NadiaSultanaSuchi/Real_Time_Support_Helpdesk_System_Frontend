@@ -1,23 +1,37 @@
 "use client";
 
 import axios from "axios";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 
 type Ticket = {
   id: number;
   title: string;
+  description?: string;
+
   status: string;
   priority: string;
+
+  isEscalated?: boolean;
+  escalatedAt?: string | null;
+
   createdAt?: string;
   updatedAt?: string;
+
   customer?: {
     id?: number;
     email?: string;
   };
+
   assignee?: {
     id?: number;
     email?: string;
-  };
+  } | null;
+
+  product?: {
+    id?: number;
+    name?: string;
+  } | null;
 };
 
 type TicketResponse = {
@@ -30,101 +44,146 @@ type TicketResponse = {
 
 const API_URL = "http://127.0.0.1:3000/api";
 
-export default function TicketsPage() {
+export default function AdminTicketsPage() {
   const [tickets, setTickets] = useState<Ticket[]>([]);
 
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("ALL");
-  const [priorityFilter, setPriorityFilter] = useState("ALL");
+  const [loading, setLoading] =
+    useState(true);
 
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
+  const [error, setError] =
+    useState("");
 
-  const [loading, setLoading] = useState(true);
-  const [actionLoading, setActionLoading] = useState<number | null>(null);
+  const [statusFilter, setStatusFilter] =
+    useState("ALL");
 
-  const [error, setError] = useState("");
+  const [priorityFilter, setPriorityFilter] =
+    useState("ALL");
 
-  /* ---------------- Get Tickets ---------------- */
+  const [search, setSearch] =
+    useState("");
+
+  const [page, setPage] =
+    useState(1);
+
+  const [totalPages, setTotalPages] =
+    useState(1);
+
+  const [totalTickets, setTotalTickets] =
+    useState(0);
+
+  const [actionLoading, setActionLoading] =
+    useState<number | null>(null);
+
+  // =========================
+  // FETCH TICKETS
+  // =========================
 
   const fetchTickets = async () => {
     try {
       setLoading(true);
       setError("");
 
-      const accessToken = localStorage.getItem("accessToken");
+      const accessToken =
+        localStorage.getItem(
+          "accessToken"
+        );
 
       if (!accessToken) {
-        setError("You are not logged in.");
+        setError(
+          "You are not logged in."
+        );
         return;
       }
 
-      const response = await axios.get<TicketResponse>(
-        `${API_URL}/tickets`,
-        {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-          },
+      const response =
+        await axios.get<TicketResponse>(
+          `${API_URL}/tickets`,
+          {
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+            },
 
-          params: {
-            status:
-              statusFilter === "ALL"
-                ? undefined
-                : statusFilter,
+            params: {
+              status:
+                statusFilter === "ALL"
+                  ? undefined
+                  : statusFilter,
 
-            priority:
-              priorityFilter === "ALL"
-                ? undefined
-                : priorityFilter,
+              priority:
+                priorityFilter === "ALL"
+                  ? undefined
+                  : priorityFilter,
 
-            page,
-            limit: 10,
+              page,
 
-            sortBy: "createdAt",
-            order: "DESC",
-          },
-        }
+              limit: 10,
+
+              sortBy: "createdAt",
+
+              order: "DESC",
+            },
+          }
+        );
+
+      setTickets(
+        response.data.data
       );
 
-      setTickets(response.data.data);
-      setTotalPages(response.data.totalPages);
-    } catch (error) {
-      console.error(error);
+      setTotalPages(
+        response.data.totalPages
+      );
 
-      if (axios.isAxiosError(error)) {
-        setError(
-          error.response?.data?.message ||
-            error.response?.data?.error ||
-            "Failed to load tickets."
-        );
-      } else {
-        setError("Failed to load tickets.");
-      }
+      setTotalTickets(
+        response.data.total
+      );
+    } catch (err: any) {
+      console.error(
+        "Error loading tickets:",
+        err
+      );
+
+      setError(
+        err.response?.data?.error ||
+          err.response?.data?.message ||
+          "Failed to load tickets."
+      );
     } finally {
       setLoading(false);
     }
   };
 
-  /* ---------------- Load Tickets ---------------- */
-
   useEffect(() => {
     fetchTickets();
-  }, [statusFilter, priorityFilter, page]);
+  }, [
+    statusFilter,
+    priorityFilter,
+    page,
+  ]);
 
-  /* ---------------- Ticket Action ---------------- */
+  // =========================
+  // TICKET ACTION
+  // =========================
 
-  const handleAction = async (
+  const performAction = async (
     ticketId: number,
-    action: "accept" | "escalate" | "close"
+    action:
+      | "accept"
+      | "escalate"
+      | "close"
   ) => {
     try {
       setActionLoading(ticketId);
       setError("");
 
-      const accessToken = localStorage.getItem("accessToken");
+      const accessToken =
+        localStorage.getItem(
+          "accessToken"
+        );
 
       if (!accessToken) {
-        setError("You are not logged in.");
+        setError(
+          "You are not logged in."
+        );
         return;
       }
 
@@ -138,325 +197,483 @@ export default function TicketsPage() {
         }
       );
 
-      // Reload tickets after action
       await fetchTickets();
-    } catch (error) {
-      console.error(error);
+    } catch (err: any) {
+      console.error(
+        `Error performing ${action}:`,
+        err
+      );
 
-      if (axios.isAxiosError(error)) {
-        setError(
-          error.response?.data?.message ||
-            error.response?.data?.error ||
-            `Failed to ${action} ticket.`
-        );
-      } else {
-        setError(`Failed to ${action} ticket.`);
-      }
+      setError(
+        err.response?.data?.error ||
+          err.response?.data?.message ||
+          `Failed to ${action} ticket.`
+      );
     } finally {
       setActionLoading(null);
     }
   };
 
-  /* ---------------- Search ---------------- */
+  // =========================
+  // SEARCH
+  // =========================
 
-  const filteredTickets = tickets.filter((ticket) => {
-    const searchText = search.toLowerCase();
+  const filteredTickets =
+    tickets.filter((ticket) => {
+      const value =
+        search.toLowerCase();
 
-    return (
-      ticket.title.toLowerCase().includes(searchText) ||
-      String(ticket.id).includes(searchText) ||
-      ticket.customer?.email
-        ?.toLowerCase()
-        .includes(searchText)
-    );
-  });
+      return (
+        ticket.title
+          ?.toLowerCase()
+          .includes(value) ||
+        ticket.customer?.email
+          ?.toLowerCase()
+          .includes(value) ||
+        ticket.product?.name
+          ?.toLowerCase()
+          .includes(value) ||
+        String(ticket.id).includes(
+          value
+        )
+      );
+    });
+
+  // =========================
+  // HELPERS
+  // =========================
+
+  const formatDate = (
+    date?: string
+  ) => {
+    if (!date) {
+      return "—";
+    }
+
+    return new Date(
+      date
+    ).toLocaleDateString();
+  };
+
+  const getPriorityClass = (
+    priority: string
+  ) => {
+    switch (priority) {
+      case "Urgent":
+        return "bg-red-100 text-red-700";
+
+      case "High":
+        return "bg-orange-100 text-orange-700";
+
+      case "Medium":
+        return "bg-yellow-100 text-yellow-700";
+
+      case "Low":
+        return "bg-green-100 text-green-700";
+
+      default:
+        return "bg-gray-100 text-gray-700";
+    }
+  };
+
+  const getStatusClass = (
+    status: string
+  ) => {
+    switch (status) {
+      case "Open":
+        return "bg-blue-100 text-blue-700";
+
+      case "InProgress":
+        return "bg-purple-100 text-purple-700";
+
+      case "Resolved":
+        return "bg-green-100 text-green-700";
+
+      case "Closed":
+        return "bg-gray-100 text-gray-700";
+
+      default:
+        return "bg-gray-100 text-gray-700";
+    }
+  };
+
+  // =========================
+  // PAGE
+  // =========================
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-6">
 
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-slate-900">
+        <h1 className="text-2xl font-bold text-gray-900">
           Tickets
         </h1>
 
-        <p className="mt-1 text-sm text-slate-500">
+        <p className="mt-1 text-sm text-gray-500">
           Manage and monitor all support tickets.
         </p>
       </div>
 
-      {/* Error */}
-      {error && (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
-          {error}
-        </div>
-      )}
-
       {/* Summary */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
 
-        <SummaryCard
-          title="Tickets"
-          value={tickets.length}
-          description="Current page"
-        />
+        <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+          <p className="text-sm text-gray-500">
+            Total Tickets
+          </p>
 
-        <SummaryCard
-          title="Open"
-          value={
-            tickets.filter(
-              (ticket) =>
-                ticket.status.toUpperCase() === "OPEN"
-            ).length
-          }
-          description="Waiting for action"
-        />
+          <p className="mt-2 text-2xl font-bold text-gray-900">
+            {totalTickets}
+          </p>
+        </div>
 
-        <SummaryCard
-          title="In Progress"
-          value={
-            tickets.filter(
-              (ticket) =>
-                ticket.status.toUpperCase() ===
-                "IN_PROGRESS"
-            ).length
-          }
-          description="Currently assigned"
-        />
+        <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+          <p className="text-sm text-gray-500">
+            Open
+          </p>
 
-        <SummaryCard
-          title="Urgent"
-          value={
-            tickets.filter(
-              (ticket) =>
-                ticket.priority.toUpperCase() ===
-                "URGENT"
-            ).length
-          }
-          description="Needs attention"
-        />
+          <p className="mt-2 text-2xl font-bold text-blue-600">
+            {
+              tickets.filter(
+                (ticket) =>
+                  ticket.status === "Open"
+              ).length
+            }
+          </p>
+        </div>
 
+        <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+          <p className="text-sm text-gray-500">
+            In Progress
+          </p>
+
+          <p className="mt-2 text-2xl font-bold text-purple-600">
+            {
+              tickets.filter(
+                (ticket) =>
+                  ticket.status ===
+                  "InProgress"
+              ).length
+            }
+          </p>
+        </div>
+
+        <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+          <p className="text-sm text-gray-500">
+            Urgent
+          </p>
+
+          <p className="mt-2 text-2xl font-bold text-red-600">
+            {
+              tickets.filter(
+                (ticket) =>
+                  ticket.priority ===
+                  "Urgent"
+              ).length
+            }
+          </p>
+        </div>
       </div>
 
       {/* Filters */}
-      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
 
-        <div className="flex flex-col gap-3 lg:flex-row">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
 
           {/* Search */}
-          <div className="flex-1">
+          <div>
+            <label className="mb-2 block text-sm font-medium text-gray-700">
+              Search
+            </label>
+
             <input
               type="text"
-              placeholder="Search by ticket ID, title or customer..."
               value={search}
               onChange={(e) =>
-                setSearch(e.target.value)
+                setSearch(
+                  e.target.value
+                )
               }
-              className="w-full rounded-lg border border-slate-200 px-4 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+              placeholder="Search ticket, customer or product..."
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
             />
           </div>
 
           {/* Status */}
-          <select
-            value={statusFilter}
-            onChange={(e) => {
-              setPage(1);
-              setStatusFilter(e.target.value);
-            }}
-            className="rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-          >
-            <option value="ALL">
-              All Statuses
-            </option>
+          <div>
+            <label className="mb-2 block text-sm font-medium text-gray-700">
+              Status
+            </label>
 
-            <option value="Open">
-              Open
-            </option>
+            <select
+              value={statusFilter}
+              onChange={(e) => {
+                setStatusFilter(
+                  e.target.value
+                );
+                setPage(1);
+              }}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+            >
+              <option value="ALL">
+                All Statuses
+              </option>
 
-            <option value="InProgress">
-              In Progress
-            </option>
+              <option value="Open">
+                Open
+              </option>
 
-            <option value="Closed">
-              Closed
-            </option>
-          </select>
+              <option value="InProgress">
+                In Progress
+              </option>
+
+              <option value="Resolved">
+                Resolved
+              </option>
+
+              <option value="Closed">
+                Closed
+              </option>
+            </select>
+          </div>
 
           {/* Priority */}
-          <select
-            value={priorityFilter}
-            onChange={(e) => {
-              setPage(1);
-              setPriorityFilter(e.target.value);
-            }}
-            className="rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-          >
-            <option value="ALL">
-              All Priorities
-            </option>
+          <div>
+            <label className="mb-2 block text-sm font-medium text-gray-700">
+              Priority
+            </label>
 
-            <option value="Urgent">
-              Urgent
-            </option>
+            <select
+              value={priorityFilter}
+              onChange={(e) => {
+                setPriorityFilter(
+                  e.target.value
+                );
+                setPage(1);
+              }}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+            >
+              <option value="ALL">
+                All Priorities
+              </option>
 
-            <option value="High">
-              High
-            </option>
+              <option value="Low">
+                Low
+              </option>
 
-            <option value="Medium">
-              Medium
-            </option>
+              <option value="Medium">
+                Medium
+              </option>
 
-            <option value="Low">
-              Low
-            </option>
-          </select>
+              <option value="High">
+                High
+              </option>
 
+              <option value="Urgent">
+                Urgent
+              </option>
+            </select>
+          </div>
         </div>
       </div>
 
+      {/* Error */}
+      {error && (
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+          {error}
+        </div>
+      )}
+
       {/* Table */}
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
 
-        <div className="overflow-x-auto">
+        {loading ? (
+          <div className="flex min-h-[300px] items-center justify-center">
+            <p className="text-sm text-gray-500">
+              Loading tickets...
+            </p>
+          </div>
+        ) : filteredTickets.length === 0 ? (
+          <div className="flex min-h-[300px] items-center justify-center">
+            <p className="text-sm text-gray-500">
+              No tickets found.
+            </p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
 
-          <table className="w-full text-left">
+            <table className="min-w-full divide-y divide-gray-200">
 
-            <thead className="border-b border-slate-200 bg-slate-50">
-              <tr>
-
-                <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Ticket
-                </th>
-
-                <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Customer
-                </th>
-
-                <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Priority
-                </th>
-
-                <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Status
-                </th>
-
-                <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Assigned To
-                </th>
-
-                <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Created
-                </th>
-
-                <th className="px-6 py-4 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Action
-                </th>
-
-              </tr>
-            </thead>
-
-            <tbody className="divide-y divide-slate-100">
-
-              {loading ? (
+              <thead className="bg-gray-50">
                 <tr>
-                  <td
-                    colSpan={7}
-                    className="px-6 py-12 text-center text-sm text-slate-500"
-                  >
-                    Loading tickets...
-                  </td>
+
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                    Ticket
+                  </th>
+
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                    Customer
+                  </th>
+
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                    Product
+                  </th>
+
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                    Priority
+                  </th>
+
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                    Status
+                  </th>
+
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                    Assigned To
+                  </th>
+
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                    Created
+                  </th>
+
+                  <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">
+                    Action
+                  </th>
+
                 </tr>
-              ) : filteredTickets.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={7}
-                    className="px-6 py-12 text-center text-sm text-slate-500"
-                  >
-                    No tickets found.
-                  </td>
-                </tr>
-              ) : (
-                filteredTickets.map((ticket) => (
+              </thead>
 
-                  <tr
-                    key={ticket.id}
-                    className="transition hover:bg-slate-50"
-                  >
+              <tbody className="divide-y divide-gray-200 bg-white">
 
-                    {/* Ticket */}
-                    <td className="px-6 py-4">
+                {filteredTickets.map(
+                  (ticket) => (
+                    <tr
+                      key={ticket.id}
+                      className="hover:bg-gray-50"
+                    >
 
-                      <p className="text-xs font-semibold text-blue-600">
-                        #{ticket.id}
-                      </p>
+                      {/* Ticket */}
+                      <td className="whitespace-nowrap px-6 py-4">
 
-                      <p className="mt-1 max-w-xs font-medium text-slate-900">
-                        {ticket.title}
-                      </p>
+                        <div className="flex items-center gap-3">
 
-                    </td>
+                          <div>
+                            <p className="text-xs text-gray-500">
+                              #{ticket.id}
+                            </p>
 
-                    {/* Customer */}
-                    <td className="px-6 py-4">
+                            <p className="max-w-[220px] truncate font-medium text-gray-900">
+                              {ticket.title}
+                            </p>
+                          </div>
 
-                      <span className="text-sm text-slate-700">
-                        {ticket.customer?.email ||
-                          "Unknown"}
-                      </span>
+                        </div>
 
-                    </td>
+                      </td>
 
-                    {/* Priority */}
-                    <td className="px-6 py-4">
-                      <PriorityBadge
-                        priority={ticket.priority}
-                      />
-                    </td>
+                      {/* Customer */}
+                      <td className="whitespace-nowrap px-6 py-4">
 
-                    {/* Status */}
-                    <td className="px-6 py-4">
-                      <StatusBadge
-                        status={ticket.status}
-                      />
-                    </td>
+                        <p className="text-sm text-gray-700">
+                          {ticket.customer?.email ||
+                            "Unknown"}
+                        </p>
 
-                    {/* Assignee */}
-                    <td className="px-6 py-4">
+                      </td>
 
-                      <span
-                        className={
-                          !ticket.assignee
-                            ? "text-sm italic text-slate-400"
-                            : "text-sm text-slate-700"
-                        }
-                      >
-                        {ticket.assignee?.email ||
-                          "Unassigned"}
-                      </span>
+                      {/* Product */}
+                      <td className="whitespace-nowrap px-6 py-4">
 
-                    </td>
+                        {ticket.product ? (
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">
+                              {ticket.product.name}
+                            </p>
 
-                    {/* Created */}
-                    <td className="px-6 py-4 text-sm text-slate-500">
-                      {ticket.createdAt
-                        ? new Date(
+                            {ticket.product.id && (
+                              <p className="text-xs text-gray-500">
+                                ID:{" "}
+                                {ticket.product.id}
+                              </p>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-sm text-gray-400">
+                            No product
+                          </span>
+                        )}
+
+                      </td>
+
+                      {/* Priority */}
+                      <td className="whitespace-nowrap px-6 py-4">
+
+                        <span
+                          className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${getPriorityClass(
+                            ticket.priority
+                          )}`}
+                        >
+                          {ticket.priority}
+                        </span>
+
+                      </td>
+
+                      {/* Status */}
+                      <td className="whitespace-nowrap px-6 py-4">
+
+                        <span
+                          className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${getStatusClass(
+                            ticket.status
+                          )}`}
+                        >
+                          {ticket.status ===
+                          "InProgress"
+                            ? "In Progress"
+                            : ticket.status}
+                        </span>
+
+                      </td>
+
+                      {/* Assigned */}
+                      <td className="whitespace-nowrap px-6 py-4">
+
+                        <span className="text-sm text-gray-700">
+                          {ticket.assignee?.email ||
+                            "Unassigned"}
+                        </span>
+
+                      </td>
+
+                      {/* Created */}
+                      <td className="whitespace-nowrap px-6 py-4">
+
+                        <span className="text-sm text-gray-600">
+                          {formatDate(
                             ticket.createdAt
-                          ).toLocaleDateString()
-                        : "-"}
-                    </td>
+                          )}
+                        </span>
 
-                    {/* Actions */}
-                    <td className="px-6 py-4">
+                      </td>
 
-                      <div className="flex justify-end gap-2">
+                      {/* Actions */}
+                      <td className="whitespace-nowrap px-6 py-4">
 
-                        {/* Accept */}
-                        {!isClosed(ticket) &&
-                          !ticket.assignee && (
+                        <div className="flex items-center justify-end gap-2">
+
+                          {/* View */}
+                          <Link
+                            href={`/admin/tickets/${ticket.id}`}
+                            className="rounded-lg bg-gray-100 px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-200"
+                          >
+                            View
+                          </Link>
+
+                          {/* Accept */}
+                          {ticket.status !==
+                            "Closed" && (
                             <button
                               onClick={() =>
-                                handleAction(
+                                performAction(
                                   ticket.id,
                                   "accept"
                                 )
@@ -465,7 +682,7 @@ export default function TicketsPage() {
                                 actionLoading ===
                                 ticket.id
                               }
-                              className="rounded-lg bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-600 transition hover:bg-blue-100 disabled:opacity-50"
+                              className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
                             >
                               {actionLoading ===
                               ticket.id
@@ -474,214 +691,119 @@ export default function TicketsPage() {
                             </button>
                           )}
 
-                        {/* Escalate */}
-                        {!isClosed(ticket) &&
-                          !isUrgent(ticket) && (
+                          {/* Escalate */}
+                          {ticket.status !==
+                            "Closed" &&
+                            !ticket.isEscalated && (
+                              <button
+                                onClick={() =>
+                                  performAction(
+                                    ticket.id,
+                                    "escalate"
+                                  )
+                                }
+                                disabled={
+                                  actionLoading ===
+                                  ticket.id
+                                }
+                                className="rounded-lg bg-orange-500 px-3 py-2 text-xs font-medium text-white hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-50"
+                              >
+                                Escalate
+                              </button>
+                            )}
+
+                          {/* Close */}
+                          {ticket.status !==
+                            "Closed" && (
                             <button
                               onClick={() =>
-                                handleAction(
+                                performAction(
                                   ticket.id,
-                                  "escalate"
+                                  "close"
                                 )
                               }
                               disabled={
                                 actionLoading ===
                                 ticket.id
                               }
-                              className="rounded-lg bg-orange-50 px-3 py-2 text-xs font-semibold text-orange-600 transition hover:bg-orange-100 disabled:opacity-50"
+                              className="rounded-lg bg-green-600 px-3 py-2 text-xs font-medium text-white hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
                             >
-                              Escalate
+                              Close
                             </button>
                           )}
 
-                        {/* Close */}
-                        {!isClosed(ticket) && (
-                          <button
-                            onClick={() =>
-                              handleAction(
-                                ticket.id,
-                                "close"
-                              )
-                            }
-                            disabled={
-                              actionLoading ===
-                              ticket.id
-                            }
-                            className="rounded-lg bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-600 transition hover:bg-emerald-100 disabled:opacity-50"
-                          >
-                            Close
-                          </button>
-                        )}
+                        </div>
 
-                      </div>
+                      </td>
 
-                    </td>
+                    </tr>
+                  )
+                )}
 
-                  </tr>
+              </tbody>
+            </table>
 
-                ))
-              )}
+          </div>
+        )}
 
-            </tbody>
-
-          </table>
-
-        </div>
       </div>
 
       {/* Pagination */}
-      <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
+      {!loading &&
+        totalPages > 1 && (
+          <div className="flex items-center justify-between rounded-xl border border-gray-200 bg-white px-5 py-4 shadow-sm">
 
-        <p className="text-sm text-slate-500">
-          Page{" "}
-          <span className="font-medium text-slate-900">
-            {page}
-          </span>{" "}
-          of{" "}
-          <span className="font-medium text-slate-900">
-            {totalPages}
-          </span>
-        </p>
+            <p className="text-sm text-gray-500">
+              Page{" "}
+              <span className="font-medium text-gray-900">
+                {page}
+              </span>{" "}
+              of{" "}
+              <span className="font-medium text-gray-900">
+                {totalPages}
+              </span>
+            </p>
 
-        <div className="flex gap-2">
+            <div className="flex gap-2">
 
-          <button
-            disabled={page === 1}
-            onClick={() =>
-              setPage((current) =>
-                Math.max(1, current - 1)
-              )
-            }
-            className="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            Previous
-          </button>
+              <button
+                onClick={() =>
+                  setPage(
+                    (current) =>
+                      Math.max(
+                        1,
+                        current - 1
+                      )
+                  )
+                }
+                disabled={page === 1}
+                className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Previous
+              </button>
 
-          <span className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white">
-            {page}
-          </span>
+              <button
+                onClick={() =>
+                  setPage(
+                    (current) =>
+                      Math.min(
+                        totalPages,
+                        current + 1
+                      )
+                  )
+                }
+                disabled={
+                  page === totalPages
+                }
+                className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Next
+              </button>
 
-          <button
-            disabled={page >= totalPages}
-            onClick={() =>
-              setPage((current) =>
-                Math.min(
-                  totalPages,
-                  current + 1
-                )
-              )
-            }
-            className="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            Next
-          </button>
-
-        </div>
-      </div>
-
-    </div>
-  );
-}
-
-/* ---------------- Helpers ---------------- */
-
-function isClosed(ticket: Ticket) {
-  return ticket.status.toUpperCase() === "CLOSED";
-}
-
-function isUrgent(ticket: Ticket) {
-  return ticket.priority.toUpperCase() === "URGENT";
-}
-
-/* ---------------- Summary Card ---------------- */
-
-function SummaryCard({
-  title,
-  value,
-  description,
-}: {
-  title: string;
-  value: number;
-  description: string;
-}) {
-  return (
-    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-
-      <p className="text-sm font-medium text-slate-500">
-        {title}
-      </p>
-
-      <p className="mt-2 text-2xl font-bold text-slate-900">
-        {value}
-      </p>
-
-      <p className="mt-1 text-xs text-slate-400">
-        {description}
-      </p>
+            </div>
+          </div>
+        )}
 
     </div>
-  );
-}
-
-/* ---------------- Priority Badge ---------------- */
-
-function PriorityBadge({
-  priority,
-}: {
-  priority: string;
-}) {
-  const value = priority.toUpperCase();
-
-  const styles: Record<string, string> = {
-    LOW: "bg-slate-100 text-slate-600",
-    MEDIUM: "bg-yellow-100 text-yellow-700",
-    HIGH: "bg-orange-100 text-orange-700",
-    URGENT: "bg-red-100 text-red-700",
-  };
-
-  return (
-    <span
-      className={`rounded-full px-3 py-1 text-xs font-semibold ${
-        styles[value] ||
-        "bg-slate-100 text-slate-600"
-      }`}
-    >
-      {priority}
-    </span>
-  );
-}
-
-/* ---------------- Status Badge ---------------- */
-
-function StatusBadge({
-  status,
-}: {
-  status: string;
-}) {
-  const value = status.toUpperCase();
-
-  const styles: Record<string, string> = {
-    OPEN: "bg-blue-100 text-blue-700",
-    IN_PROGRESS: "bg-indigo-100 text-indigo-700",
-    ESCALATED: "bg-red-100 text-red-700",
-    CLOSED: "bg-emerald-100 text-emerald-700",
-  };
-
-  const labels: Record<string, string> = {
-    OPEN: "Open",
-    IN_PROGRESS: "In Progress",
-    ESCALATED: "Escalated",
-    CLOSED: "Closed",
-  };
-
-  return (
-    <span
-      className={`rounded-full px-3 py-1 text-xs font-semibold ${
-        styles[value] ||
-        "bg-slate-100 text-slate-600"
-      }`}
-    >
-      {labels[value] || status}
-    </span>
   );
 }
