@@ -1,40 +1,11 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
-import {FormEvent, useState, useEffect} from "react";
-import {useRouter, usePathname} from "next/navigation";
-import {api} from "@/lib/api";
-import type { PaginatedTickets, Profile, TicketStatus }  from "@/lib/types";
-
-const icons = {
-  dashboard: (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="M3 12l9-9 9 9M5 10v10h14V10" />
-    </svg>
-  ),
-  tickets: (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="M3 8a2 2 0 012-2h14a2 2 0 012 2v2a2 2 0 000 4v2a2 2 0 01-2 2H5a2 2 0 01-2-2v-2a2 2 0 000-4V8z" />
-    </svg>
-  ),
-  new: (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <circle cx="12" cy="12" r="9" /><path d="M12 8v8M8 12h8" />
-    </svg>
-  ),
-  profile: (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <circle cx="12" cy="8" r="4" /><path d="M4 20c0-4 4-6 8-6s8 2 8 6" />
-    </svg>
-  ),
-};
-
-const links= [
-  {href: "/dashboard",label: "Dashboard", icon:icons.dashboard},
-  { href: "/dashboard/tickets", label: "My Tickets", icon: icons.tickets },
-  { href: "/dashboard/tickets/new", label: "New Ticket", icon: icons.new },
-  { href: "/dashboard/profile", label: "Profile", icon: icons.profile },
-]
+import DashboardShell from "@/components/DashboardShell";
+import { api } from "@/lib/api";
+import type { PaginatedTickets, TicketPriority, TicketStatus } from "@/lib/types";
 
 const statusColors: Record<TicketStatus, string> = {
   Open: "text-blue-400",
@@ -43,121 +14,85 @@ const statusColors: Record<TicketStatus, string> = {
   Closed: "text-gray-400",
 };
 
-export default function CustomerDashboard(){
+const priorityColors: Record<TicketPriority, string> = {
+  Low: "bg-gray-500",
+  Medium: "bg-blue-500",
+  High: "bg-amber-500",
+  Urgent: "bg-red-500",
+};
+
+function getGreeting() {
+  const hour = new Date().getHours();
+  if (hour < 12) return "Good morning";
+  if (hour < 18) return "Good afternoon";
+  return "Good evening";
+}
+
+export default function DashboardPage() {
   const router = useRouter();
-  const pathname = usePathname();
-  const [profile, setProfile] = useState<Profile | null>(null);
+  const [all, setAll] = useState<PaginatedTickets["data"]>([]);
   const [total, setTotal] = useState<number | null>(null);
-  const [recent, setRecent] = useState<PaginatedTickets["data"]>([]);
-  const [search, setSearch] = useState("");
-  const [searchError, setSearchError] = useState("");
+  const [loading, setLoading] = useState(true);
 
-
-    useEffect(() => {
-    api.get<Profile>("/profile").then((res) => setProfile(res.data));
-    api.get<PaginatedTickets>("/my/tickets", { params: { page: 1, limit: 5 } }).then((res) => {
+  useEffect(() => {
+    api.get<PaginatedTickets>("/my/tickets", { params: { page: 1, limit: 50 } }).then((res) => {
       setTotal(res.data.total);
-      setRecent(res.data.data);
+      setAll(res.data.data);
+      setLoading(false);
     });
   }, []);
 
-    const handleSearch = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setSearchError("");
-    const id = search.trim();
-    if (!id || !/^\d+$/.test(id)) {
-      setSearchError("Enter a valid ticket ID (number).");
-      return;
-    }
-    try {
-      await api.get(`/my/tickets/${id}`);
-      router.push(`/dashboard/tickets/${id}`);
-    } catch {
-      setSearchError(`No ticket found with ID ${id}.`);
-    }
-  };
+  const openCount = all.filter((t) => t.status === "Open").length;
+  const progressCount = all.filter((t) => t.status === "InProgress").length;
+  const resolvedCount = all.filter((t) => t.status === "Resolved" || t.status === "Closed").length;
+  const recent = all.slice(0, 5);
 
+  const priorities: TicketPriority[] = ["Urgent", "High", "Medium", "Low"];
+  const priorityCounts = priorities.map((p) => ({
+    label: p,
+    count: all.filter((t) => t.priority === p).length,
+  }));
+  const maxPriorityCount = Math.max(1, ...priorityCounts.map((p) => p.count));
 
-
-
-
-
-
-    return (
-    <div className="flex min-h-screen gap-4 bg-black p-4">
-      <aside className="flex w-64 flex-col justify-between rounded-2xl border border-neutral-800 bg-neutral-950 p-5">
+  return (
+    <DashboardShell>
+      <div className="flex items-center justify-between">
         <div>
-          <div className="mb-8 flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 text-white font-bold">
-              ◆
-            </div>
-            <div>
-              <div className="text-sm font-semibold leading-none text-white">Support</div>
-              <div className="text-xs text-gray-500">Ticket System</div>
-            </div>
-          </div>
-                <nav className="space-y-1.5">
-            {links.map(({ href, label, icon }) => {
-              const active = pathname === href;
-              return (
-                <Link
-                  key={href}
-                  href={href}
-                  className={`flex items-center gap-3 rounded-xl px-4 py-2.5 text-sm font-medium transition ${
-                    active ? "bg-purple-600 text-white" : "text-gray-400 hover:bg-neutral-900 hover:text-white"
-                  }`}
-                >
-                  {icon}
-                  {label}
-                </Link>
-              );
-            })}
-          </nav>
+          <h1 className="text-3xl font-bold text-white">{getGreeting()}!</h1>
+          <p className="mt-1 text-sm text-gray-500">Here's an overview of your support activity.</p>
         </div>
-
-                <Link href="/dashboard/profile" className="flex items-center gap-3 rounded-xl px-2 py-2 transition hover:bg-neutral-900">
-          <div className="h-9 w-9 rounded-full bg-neutral-700" />
-          <div className="min-w-0">
-            <div className="truncate text-sm font-medium text-white">{profile?.name || profile?.email || "..."}</div>
-            <div className="text-xs text-gray-500">{profile?.role ?? ""}</div>
-          </div>
+        <Link
+          href="/dashboard/tickets/new"
+          className="rounded-xl bg-purple-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-purple-900/30 hover:bg-purple-500"
+        >
+          + New Ticket
         </Link>
-      </aside>
+      </div>
 
-
-      <div className="flex-1 rounded-2xl border border-neutral-800 bg-neutral-950 p-6">
-        <div className="mb-2 flex items-center justify-between gap-4">
-          <form onSubmit={handleSearch} className="max-w-md flex-1">
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search ticket by ID..."
-              className="w-full rounded-xl border border-neutral-800 bg-neutral-900 px-4 py-2.5 text-sm text-white outline-none placeholder:text-gray-500 focus:border-purple-500"
-            />
-          </form>
-          <Link href="/dashboard/profile" className="flex items-center gap-3">
-            <div className="h-9 w-9 rounded-full bg-neutral-700" />
-            <span className="text-sm font-medium text-white">{profile?.name || profile?.email || "..."}</span>
-          </Link>
-        </div>
-        {searchError && <p className="mb-6 text-sm text-red-400">{searchError}</p>}
-        {!searchError && <div className="mb-6" />}
-
-                <h1 className="text-3xl font-bold text-white">Welcome Back!</h1>
-        <p className="mt-1 text-sm text-gray-500">Here's an overview of your support activity.</p>
-
-        <div className="mt-6 w-48 rounded-2xl bg-gradient-to-br from-purple-600 to-indigo-700 p-5">
-          <div className="mb-6 h-9 w-9 rounded-full bg-white/30" />
+      <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-4">
+        <div className="rounded-2xl bg-gradient-to-br from-purple-600 to-indigo-700 p-5">
           <div className="text-sm text-purple-100">Total Tickets</div>
-          <div className="text-4xl font-bold text-white">{total ?? "—"}</div>
+          <div className="mt-1 text-4xl font-bold text-white">{total ?? "—"}</div>
         </div>
+        <div className="rounded-2xl border border-neutral-800 bg-neutral-900 p-5">
+          <div className="text-sm text-gray-400">Open</div>
+          <div className="mt-1 text-4xl font-bold text-blue-400">{openCount}</div>
+        </div>
+        <div className="rounded-2xl border border-neutral-800 bg-neutral-900 p-5">
+          <div className="text-sm text-gray-400">In Progress</div>
+          <div className="mt-1 text-4xl font-bold text-amber-400">{progressCount}</div>
+        </div>
+        <div className="rounded-2xl border border-neutral-800 bg-neutral-900 p-5">
+          <div className="text-sm text-gray-400">Resolved / Closed</div>
+          <div className="mt-1 text-4xl font-bold text-green-400">{resolvedCount}</div>
+        </div>
+      </div>
 
-                <div className="mt-8 overflow-hidden rounded-2xl border border-neutral-800">
+      <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <div className="overflow-hidden rounded-2xl border border-neutral-800 lg:col-span-2">
           <div className="flex items-center justify-between px-5 py-4">
             <h2 className="font-semibold text-white">Recent Tickets</h2>
-            <Link href="/dashboard/tickets" className="text-sm text-purple-400 hover:text-purple-300">
-              View All
-            </Link>
+            <Link href="/dashboard/tickets" className="text-sm text-purple-400 hover:text-purple-300">View All</Link>
           </div>
           <table className="w-full text-sm">
             <thead>
@@ -169,7 +104,10 @@ export default function CustomerDashboard(){
               </tr>
             </thead>
             <tbody>
-              {recent.map((t) => (
+              {loading && (
+                <tr><td colSpan={4} className="px-5 py-6 text-center text-gray-500">Loading...</td></tr>
+              )}
+              {!loading && recent.map((t) => (
                 <tr
                   key={t.id}
                   onClick={() => router.push(`/dashboard/tickets/${t.id}`)}
@@ -181,19 +119,66 @@ export default function CustomerDashboard(){
                   <td className="px-5 py-3 text-gray-400">{new Date(t.createdAt).toLocaleDateString()}</td>
                 </tr>
               ))}
-              {recent.length === 0 && (
+              {!loading && recent.length === 0 && (
                 <tr>
-                  <td colSpan={4} className="px-5 py-6 text-center text-gray-500">
-                    No tickets yet.
+                  <td colSpan={4} className="px-5 py-10 text-center">
+                    <p className="text-gray-500">No tickets yet.</p>
+                    <Link href="/dashboard/tickets/new" className="mt-2 inline-block text-sm text-purple-400 hover:text-purple-300">
+                      Create your first ticket →
+                    </Link>
                   </td>
                 </tr>
               )}
             </tbody>
           </table>
         </div>
-              </div>
-    </div>
+
+        <div className="space-y-4">
+          <div className="rounded-2xl border border-neutral-800 p-5">
+            <h2 className="font-semibold text-white">Priority Breakdown</h2>
+            <div className="mt-4 space-y-3">
+              {priorityCounts.map((p) => (
+                <div key={p.label}>
+                  <div className="mb-1 flex items-center justify-between text-xs text-gray-400">
+                    <span>{p.label}</span>
+                    <span>{p.count}</span>
+                  </div>
+                  <div className="h-2 w-full overflow-hidden rounded-full bg-neutral-900">
+                    <div
+                      className={`h-full rounded-full ${priorityColors[p.label as TicketPriority]}`}
+                      style={{ width: `${(p.count / maxPriorityCount) * 100}%` }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-neutral-800 p-5">
+            <h2 className="font-semibold text-white">Quick Actions</h2>
+            <div className="mt-4 space-y-2">
+              <Link
+                href="/dashboard/tickets/new"
+                className="block rounded-xl border border-neutral-800 px-4 py-3 text-sm text-gray-300 hover:border-purple-500 hover:text-white"
+              >
+                Raise a new ticket
+              </Link>
+              <Link
+                href="/dashboard/tickets"
+                className="block rounded-xl border border-neutral-800 px-4 py-3 text-sm text-gray-300 hover:border-purple-500 hover:text-white"
+              >
+                Browse all tickets
+              </Link>
+              <Link
+                href="/dashboard/profile"
+                className="block rounded-xl border border-neutral-800 px-4 py-3 text-sm text-gray-300 hover:border-purple-500 hover:text-white"
+              >
+                Update your profile
+              </Link>
+            </div>
+          </div>
+        </div>
+      </div>
+    </DashboardShell>
   );
 }
-
-

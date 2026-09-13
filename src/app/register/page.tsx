@@ -178,28 +178,28 @@ export default function RegisterPage() {
             <header className="relative z-10">
                 <nav className="mx-auto flex max-w-6xl items-center justify-center gap-8 px-6 py-6 sm:gap-10">
                     <Link
-                        href="/landing"
+                        href="/"
                         className="text-xs font-medium uppercase text-zinc-400 transition hover:text-white"
                     >
                         Home
                     </Link>
 
                     <Link
-                        href="/tickets"
+                        href="../login"
                         className="text-xs font-medium uppercase text-zinc-400 transition hover:text-white"
                     >
                         Tickets
                     </Link>
 
                     <Link
-                        href="/profile"
+                        href="../login"
                         className="text-xs font-medium uppercase text-zinc-400 transition hover:text-white"
                     >
                         Profile
                     </Link>
 
                     <Link
-                        href="/login"
+                        href="../login"
                         className="rounded-full bg-white px-8 py-3 text-xs font-semibold uppercase text-black transition hover:bg-zinc-200"
                     >
                         Login

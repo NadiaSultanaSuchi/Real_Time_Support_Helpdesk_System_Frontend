@@ -43,7 +43,7 @@ export default function Home() {
       </div>
 
       <div className="absolute left-73 top-161">
-        <Link className="rounded-full border-1 border-gray-500 bg-gray-900 px-7 py-5 text-m font-semibold text-white shadow-lg shadow-gray-700 hover:bg-gray-800 hover:shadow-xl hover:shadow-gray-400 transition duration-300" href="/registration">Get Started</Link>
+        <Link className="rounded-full border-1 border-gray-500 bg-gray-900 px-7 py-5 text-m font-semibold text-white shadow-lg shadow-gray-700 hover:bg-gray-800 hover:shadow-xl hover:shadow-gray-400 transition duration-300" href="/register">Get Started</Link>
       </div>
 
       <iframe

@@ -1,97 +1,47 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
-import { useRouter, usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
+import DashboardShell from "@/components/DashboardShell";
 import { api } from "@/lib/api";
-import type { PaginatedTickets, Profile, TicketStatus } from "@/lib/types";
+import type { PaginatedTickets, TicketPriority, TicketStatus } from "@/lib/types";
 
-
-const icons = {
-  dashboard: (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="M3 12l9-9 9 9M5 10v10h14V10" />
-    </svg>
-  ),
-  tickets: (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="M3 8a2 2 0 012-2h14a2 2 0 012 2v2a2 2 0 000 4v2a2 2 0 01-2 2H5a2 2 0 01-2-2v-2a2 2 0 000-4V8z" />
-    </svg>
-  ),
-  new: (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <circle cx="12" cy="12" r="9" /><path d="M12 8v8M8 12h8" />
-    </svg>
-  ),
-  profile: (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <circle cx="12" cy="8" r="4" /><path d="M4 20c0-4 4-6 8-6s8 2 8 6" />
-    </svg>
-  ),
+const statusStyles: Record<TicketStatus, string> = {
+  Open: "bg-blue-500/10 text-blue-400 border border-blue-500/30",
+  InProgress: "bg-amber-500/10 text-amber-400 border border-amber-500/30",
+  Resolved: "bg-green-500/10 text-green-400 border border-green-500/30",
+  Closed: "bg-gray-500/10 text-gray-400 border border-gray-500/30",
 };
 
-const links = [
-  { href: "/dashboard", label: "Dashboard", icon: icons.dashboard },
-  { href: "/dashboard/tickets", label: "My Tickets", icon: icons.tickets },
-  { href: "/dashboard/tickets/new", label: "New Ticket", icon: icons.new },
-  { href: "/dashboard/profile", label: "Profile", icon: icons.profile },
-];
-
-const statusColors: Record<TicketStatus, string> = {
-  Open: "text-blue-400",
-  InProgress: "text-amber-400",
-  Resolved: "text-green-400",
-  Closed: "text-gray-400",
+const priorityDot: Record<TicketPriority, string> = {
+  Low: "bg-gray-500",
+  Medium: "bg-blue-500",
+  High: "bg-amber-500",
+  Urgent: "bg-red-500",
 };
 
-
+const statusTabs: ("All" | TicketStatus)[] = ["All", "Open", "InProgress", "Resolved", "Closed"];
 
 export default function MyTicketsPage() {
   const router = useRouter();
-  const pathname = usePathname();
-
-  const [profile, setProfile] = useState<Profile | null>(null);
-  const [result, setResult] = useState<PaginatedTickets | null>(null);
-  const [page, setPage] = useState(1);
+  const [all, setAll] = useState<PaginatedTickets["data"]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [searchError, setSearchError] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"All" | TicketStatus>("All");
+  const [priorityFilter, setPriorityFilter] = useState<"All" | TicketPriority>("All");
 
-
-
-    const loadTickets = () => {
-    api.get<PaginatedTickets>("/my/tickets", { params: { page, limit: 10 } }).then((res) => setResult(res.data));
+  const loadTickets = () => {
+    setLoading(true);
+    api.get<PaginatedTickets>("/my/tickets", { params: { page: 1, limit: 100 } }).then((res) => {
+      setAll(res.data.data);
+      setLoading(false);
+    });
   };
 
+  useEffect(loadTickets, []);
 
-    useEffect(() => {
-    api.get<Profile>("/profile").then((res) => setProfile(res.data));
-  }, []);
-
-  useEffect(() => {
-    loadTickets();
-  }, [page]);
-
-
-
-    const handleSearch = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setSearchError("");
-    const id = search.trim();
-    if (!id || !/^\d+$/.test(id)) {
-      setSearchError("Enter a valid ticket ID (number).");
-      return;
-    }
-    try {
-      await api.get(`/my/tickets/${id}`);
-      router.push(`/dashboard/tickets/${id}`);
-    } catch {
-      setSearchError(`No ticket found with ID ${id}.`);
-    }
-  };
-
-
-
-    const handleDelete = async (id: number) => {
+  const handleDelete = async (id: number) => {
     if (!confirm(`Delete ticket #${id}?`)) return;
     try {
       await api.delete(`/my/tickets/${id}`);
@@ -101,174 +51,154 @@ export default function MyTicketsPage() {
     }
   };
 
+  const visible = all
+    .filter((t) => statusFilter === "All" || t.status === statusFilter)
+    .filter((t) => priorityFilter === "All" || t.priority === priorityFilter)
+    .filter((t) => {
+      const q = search.trim().toLowerCase();
+      if (!q) return true;
+      return String(t.id).includes(q) || t.title.toLowerCase().includes(q);
+    });
 
+  const counts = {
+    Open: all.filter((t) => t.status === "Open").length,
+    InProgress: all.filter((t) => t.status === "InProgress").length,
+    Resolved: all.filter((t) => t.status === "Resolved").length,
+    Closed: all.filter((t) => t.status === "Closed").length,
+  };
 
-    return (
-    <div className="flex min-h-screen gap-4 bg-black p-4">
-
-      <aside className="flex w-64 flex-col justify-between rounded-2xl border border-neutral-800 bg-neutral-950 p-5">
+  return (
+    <DashboardShell search={{ value: search, onChange: setSearch, placeholder: "Search by ID or title..." }}>
+      <div className="flex items-center justify-between">
         <div>
-          <div className="mb-8 flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 text-white font-bold">
-              ◆
-            </div>
-            <div>
-              <div className="text-sm font-semibold leading-none text-white">Support</div>
-              <div className="text-xs text-gray-500">Ticket System</div>
-            </div>
-          </div>
-          <nav className="space-y-1.5">
-            {links.map(({ href, label, icon }) => {
-              const active = pathname === href;
-              return (
-                <Link
-                  key={href}
-                  href={href}
-                  className={`flex items-center gap-3 rounded-xl px-4 py-2.5 text-sm font-medium transition ${
-                    active ? "bg-purple-600 text-white" : "text-gray-400 hover:bg-neutral-900 hover:text-white"
-                  }`}
-                >
-                  {icon}
-                  {label}
-                </Link>
-              );
-            })}
-          </nav>
+          <h1 className="text-3xl font-bold text-white">My Tickets</h1>
+          <p className="mt-1 text-sm text-gray-500">View and manage your support tickets</p>
         </div>
-
-        <Link href="/dashboard/profile" className="flex items-center gap-3 rounded-xl px-2 py-2 transition hover:bg-neutral-900">
-          <div className="h-9 w-9 rounded-full bg-neutral-700" />
-          <div className="min-w-0">
-            <div className="truncate text-sm font-medium text-white">{profile?.name || profile?.email || "..."}</div>
-            <div className="text-xs text-gray-500">{profile?.role ?? ""}</div>
-          </div>
-        </Link>
-      </aside>
-
-
-
-
-      <div className="flex-1 rounded-2xl border border-neutral-800 bg-neutral-950 p-6">
-        <div className="mb-2 flex items-center justify-between gap-4">
-          <form onSubmit={handleSearch} className="max-w-md flex-1">
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search Tickets"
-              className="w-full rounded-xl border border-neutral-800 bg-neutral-900 px-4 py-2.5 text-sm text-white outline-none placeholder:text-gray-500 focus:border-purple-500"
-            />
-          </form>
-          <Link href="/dashboard/profile" className="flex items-center gap-3">
-            <div className="h-9 w-9 rounded-full bg-neutral-700" />
-            <span className="text-sm font-medium text-white">{profile?.name || profile?.email || "..."}</span>
-          </Link>
-        </div>
-        {searchError && <p className="mb-6 text-sm text-red-400">{searchError}</p>}
-        {!searchError && <div className="mb-6" />}
-
-
-
-                <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-white">My Tickets</h1>
-            <p className="mt-1 text-sm text-gray-500">View and manage your support tickets</p>
-          </div>
+        <div className="flex gap-3">
           <button
             onClick={loadTickets}
             className="flex items-center gap-2 rounded-xl border border-neutral-800 px-4 py-2 text-sm text-gray-300 hover:bg-neutral-900"
           >
             ⟳ Refresh
           </button>
-        </div>
-
-
-
-                <div className="mt-6 flex gap-3">
-          <span className="rounded-xl bg-purple-600 px-5 py-2 text-sm font-medium text-white">All Tickets</span>
           <Link
             href="/dashboard/tickets/new"
-            className="rounded-xl border border-neutral-800 px-5 py-2 text-sm font-medium text-gray-300 hover:bg-neutral-900"
+            className="rounded-xl bg-purple-600 px-4 py-2 text-sm font-semibold text-white hover:bg-purple-500"
           >
-            New
+            + New
           </Link>
         </div>
+      </div>
 
-
-                <div className="mt-6 overflow-hidden rounded-2xl border border-neutral-800">
-          <div className="px-5 py-4">
-            <h2 className="font-semibold text-white">All Tickets</h2>
-          </div>
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-purple-600 text-white">
-                <th className="px-5 py-2.5 text-left font-medium">ID</th>
-                <th className="px-5 py-2.5 text-left font-medium">Subject</th>
-                <th className="px-5 py-2.5 text-left font-medium">Status</th>
-                <th className="px-5 py-2.5 text-left font-medium">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {result?.data.map((t) => (
-                <tr key={t.id} className="border-t border-neutral-800 hover:bg-neutral-900">
-                  <td onClick={() => router.push(`/dashboard/tickets/${t.id}`)} className="cursor-pointer px-5 py-3 text-gray-300">
-                    #TKT-{t.id}
-                  </td>
-                  <td onClick={() => router.push(`/dashboard/tickets/${t.id}`)} className="cursor-pointer px-5 py-3 text-gray-300">
-                    {t.title}
-                  </td>
-                  <td className={`px-5 py-3 font-medium ${statusColors[t.status]}`}>{t.status.toUpperCase()}</td>
-                  <td className="px-5 py-3">
-                    {t.status === "Open" ? (
-                      <button
-                        onClick={() => handleDelete(t.id)}
-                        className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-500"
-                      >
-                        Delete
-                      </button>
-                    ) : (
-                      <span className="text-xs text-gray-600">Locked</span>
-                    )}
-                  </td>
-                </tr>
-              ))}
-              {result && result.data.length === 0 && (
-                <tr>
-                  <td colSpan={4} className="px-5 py-6 text-center text-gray-500">
-                    No tickets yet.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+      <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <div className="rounded-2xl border border-neutral-800 bg-neutral-900 p-4">
+          <div className="text-xs text-gray-500">Open</div>
+          <div className="mt-1 text-2xl font-bold text-blue-400">{counts.Open}</div>
         </div>
+        <div className="rounded-2xl border border-neutral-800 bg-neutral-900 p-4">
+          <div className="text-xs text-gray-500">In Progress</div>
+          <div className="mt-1 text-2xl font-bold text-amber-400">{counts.InProgress}</div>
+        </div>
+        <div className="rounded-2xl border border-neutral-800 bg-neutral-900 p-4">
+          <div className="text-xs text-gray-500">Resolved</div>
+          <div className="mt-1 text-2xl font-bold text-green-400">{counts.Resolved}</div>
+        </div>
+        <div className="rounded-2xl border border-neutral-800 bg-neutral-900 p-4">
+          <div className="text-xs text-gray-500">Closed</div>
+          <div className="mt-1 text-2xl font-bold text-gray-400">{counts.Closed}</div>
+        </div>
+      </div>
 
+      <div className="mt-6 flex flex-wrap items-center gap-3">
+        {statusTabs.map((tab) => (
+          <button
+            key={tab}
+            onClick={() => setStatusFilter(tab)}
+            className={`rounded-xl px-5 py-2 text-sm font-medium transition ${
+              statusFilter === tab ? "bg-purple-600 text-white" : "border border-neutral-800 text-gray-300 hover:bg-neutral-900"
+            }`}
+          >
+            {tab === "All" ? "All Tickets" : tab}
+          </button>
+        ))}
+        <select
+          value={priorityFilter}
+          onChange={(e) => setPriorityFilter(e.target.value as "All" | TicketPriority)}
+          className="ml-auto rounded-xl border border-neutral-800 bg-neutral-900 px-4 py-2 text-sm text-gray-300"
+        >
+          <option value="All">All Priorities</option>
+          <option value="Urgent">Urgent</option>
+          <option value="High">High</option>
+          <option value="Medium">Medium</option>
+          <option value="Low">Low</option>
+        </select>
+      </div>
 
-
-                {result && result.totalPages > 1 && (
-          <div className="mt-4 flex items-center justify-center gap-4">
-            <button
-              disabled={page <= 1}
-              onClick={() => setPage((p) => p - 1)}
-              className="rounded-lg border border-neutral-800 px-3 py-1.5 text-sm text-gray-300 disabled:opacity-40"
-            >
-              Previous
-            </button>
-            <span className="text-sm text-gray-500">
-              Page {result.page} of {result.totalPages}
-            </span>
-            <button
-              disabled={page >= result.totalPages}
-              onClick={() => setPage((p) => p + 1)}
-              className="rounded-lg border border-neutral-800 px-3 py-1.5 text-sm text-gray-300 disabled:opacity-40"
-            >
-              Next
-            </button>
-          </div>
-        )}
-
-
-
-              </div>
-    </div>
+      <div className="mt-6 overflow-hidden rounded-2xl border border-neutral-800">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="bg-purple-600 text-white">
+              <th className="px-5 py-2.5 text-left font-medium">ID</th>
+              <th className="px-5 py-2.5 text-left font-medium">Subject</th>
+              <th className="px-5 py-2.5 text-left font-medium">Priority</th>
+              <th className="px-5 py-2.5 text-left font-medium">Status</th>
+              <th className="px-5 py-2.5 text-left font-medium">Rating</th>
+              <th className="px-5 py-2.5 text-left font-medium">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading && (
+              <tr><td colSpan={6} className="px-5 py-10 text-center text-gray-500">Loading...</td></tr>
+            )}
+            {!loading && visible.map((t) => (
+              <tr key={t.id} className="border-t border-neutral-800 hover:bg-neutral-900">
+                <td onClick={() => router.push(`/dashboard/tickets/${t.id}`)} className="cursor-pointer px-5 py-3 text-gray-300">
+                  #TKT-{t.id}
+                </td>
+                <td onClick={() => router.push(`/dashboard/tickets/${t.id}`)} className="cursor-pointer px-5 py-3 text-gray-300">
+                  {t.title}
+                </td>
+                <td className="px-5 py-3">
+                  <span className="inline-flex items-center gap-2 text-gray-300">
+                    <span className={`h-2 w-2 rounded-full ${priorityDot[t.priority]}`} />
+                    {t.priority}
+                  </span>
+                </td>
+                <td className="px-5 py-3">
+                  <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${statusStyles[t.status]}`}>
+                    {t.status.toUpperCase()}
+                  </span>
+                </td>
+                <td className="px-5 py-3 text-amber-400">
+                  {t.rating ? "★".repeat(t.rating) + "☆".repeat(5 - t.rating) : <span className="text-gray-600">—</span>}
+                </td>
+                <td className="px-5 py-3">
+                  {t.status === "Open" ? (
+                    <button
+                      onClick={() => handleDelete(t.id)}
+                      className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-500"
+                    >
+                      Delete
+                    </button>
+                  ) : (
+                    <span className="text-xs text-gray-600">Locked</span>
+                  )}
+                </td>
+              </tr>
+            ))}
+            {!loading && visible.length === 0 && (
+              <tr>
+                <td colSpan={6} className="px-5 py-10 text-center">
+                  <p className="text-gray-500">No matching tickets.</p>
+                  <Link href="/dashboard/tickets/new" className="mt-2 inline-block text-sm text-purple-400 hover:text-purple-300">
+                    Create a new ticket →
+                  </Link>
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </DashboardShell>
   );
 }
