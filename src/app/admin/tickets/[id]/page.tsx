@@ -18,17 +18,14 @@ type Ticket = {
   ratedAt?: string | null;
   createdAt?: string;
   updatedAt?: string;
-
   customer?: {
     id?: number;
     email?: string;
   };
-
   assignee?: {
     id?: number;
     email?: string;
   } | null;
-
   product?: {
     id?: number;
     name?: string;
@@ -40,13 +37,11 @@ type Comment = {
   content: string;
   createdAt?: string;
   updatedAt?: string;
-
   author?: {
     id?: number;
     email?: string;
     role?: string;
   };
-
   user?: {
     id?: number;
     email?: string;
@@ -67,37 +62,27 @@ export default function TicketDetailsPage() {
   const router = useRouter();
 
   const [ticket, setTicket] = useState<Ticket | null>(null);
-
   const [comments, setComments] = useState<Comment[]>([]);
-
   const [managers, setManagers] = useState<Manager[]>([]);
 
   const [loading, setLoading] = useState(true);
-
   const [commentsLoading, setCommentsLoading] = useState(true);
-
   const [managersLoading, setManagersLoading] = useState(true);
 
   const [actionLoading, setActionLoading] = useState(false);
-
   const [commentLoading, setCommentLoading] = useState(false);
-
   const [assignLoading, setAssignLoading] = useState(false);
 
   const [editingCommentId, setEditingCommentId] =
     useState<number | null>(null);
 
   const [commentText, setCommentText] = useState("");
-
   const [editingText, setEditingText] = useState("");
-
   const [selectedManagerId, setSelectedManagerId] =
     useState<string>("");
 
   const [error, setError] = useState("");
-
   const [commentError, setCommentError] = useState("");
-
   const [assignError, setAssignError] = useState("");
 
   const ticketId = params.id;
@@ -107,7 +92,8 @@ export default function TicketDetailsPage() {
   // =========================
 
   const getAccessToken = () => {
-    const accessToken = localStorage.getItem("accessToken");
+    const accessToken =
+      localStorage.getItem("accessToken");
 
     if (!accessToken) {
       router.replace("/login");
@@ -143,7 +129,6 @@ export default function TicketDetailsPage() {
 
       setTicket(response.data);
 
-      // Set currently assigned manager in dropdown
       if (response.data.assignee?.id) {
         setSelectedManagerId(
           String(response.data.assignee.id)
@@ -152,7 +137,10 @@ export default function TicketDetailsPage() {
         setSelectedManagerId("");
       }
     } catch (err: any) {
-      console.error("Error loading ticket:", err);
+      console.error(
+        "Error loading ticket:",
+        err
+      );
 
       if (
         err.response?.status === 401 ||
@@ -196,13 +184,17 @@ export default function TicketDetailsPage() {
         }
       );
 
-      const commentsData = Array.isArray(response.data)
-        ? response.data
-        : response.data?.data || [];
+      const commentsData =
+        Array.isArray(response.data)
+          ? response.data
+          : response.data?.data || [];
 
       setComments(commentsData);
     } catch (err: any) {
-      console.error("Error loading comments:", err);
+      console.error(
+        "Error loading comments:",
+        err
+      );
 
       if (
         err.response?.status === 401 ||
@@ -246,25 +238,17 @@ export default function TicketDetailsPage() {
         }
       );
 
-      /*
-       * Backend may return:
-       * 
-       * [
-       *   { id: 2, email: "manager@example.com" }
-       * ]
-       *
-       * or:
-       *
-       * { data: [...] }
-       */
-
-      const managersData = Array.isArray(response.data)
-        ? response.data
-        : response.data?.data || [];
+      const managersData =
+        Array.isArray(response.data)
+          ? response.data
+          : response.data?.data || [];
 
       setManagers(managersData);
     } catch (err: any) {
-      console.error("Error loading managers:", err);
+      console.error(
+        "Error loading managers:",
+        err
+      );
 
       if (
         err.response?.status === 401 ||
@@ -332,10 +316,12 @@ export default function TicketDetailsPage() {
         }
       );
 
-      // Reload ticket so the new assignee is displayed
       await fetchTicket();
     } catch (err: any) {
-      console.error("Error assigning manager:", err);
+      console.error(
+        "Error assigning manager:",
+        err
+      );
 
       if (
         err.response?.status === 401 ||
@@ -366,6 +352,16 @@ export default function TicketDetailsPage() {
       return;
     }
 
+    // Prevent accepting a ticket that is
+    // already accepted or assigned.
+    if (
+      action === "accept" &&
+      (ticket.status !== "Open" ||
+        ticket.assignee)
+    ) {
+      return;
+    }
+
     try {
       setActionLoading(true);
       setError("");
@@ -388,7 +384,10 @@ export default function TicketDetailsPage() {
 
       await fetchTicket();
     } catch (err: any) {
-      console.error(`Error performing ${action}:`, err);
+      console.error(
+        `Error performing ${action}:`,
+        err
+      );
 
       setError(
         err.response?.data?.error ||
@@ -438,7 +437,10 @@ export default function TicketDetailsPage() {
 
       await fetchComments();
     } catch (err: any) {
-      console.error("Error adding comment:", err);
+      console.error(
+        "Error adding comment:",
+        err
+      );
 
       setCommentError(
         err.response?.data?.error ||
@@ -454,7 +456,9 @@ export default function TicketDetailsPage() {
   // START EDIT COMMENT
   // =========================
 
-  const startEditingComment = (comment: Comment) => {
+  const startEditingComment = (
+    comment: Comment
+  ) => {
     setEditingCommentId(comment.id);
     setEditingText(comment.content);
     setCommentError("");
@@ -474,11 +478,15 @@ export default function TicketDetailsPage() {
   // UPDATE COMMENT
   // =========================
 
-  const updateComment = async (commentId: number) => {
+  const updateComment = async (
+    commentId: number
+  ) => {
     const content = editingText.trim();
 
     if (!content) {
-      setCommentError("Comment cannot be empty.");
+      setCommentError(
+        "Comment cannot be empty."
+      );
       return;
     }
 
@@ -509,7 +517,10 @@ export default function TicketDetailsPage() {
 
       await fetchComments();
     } catch (err: any) {
-      console.error("Error updating comment:", err);
+      console.error(
+        "Error updating comment:",
+        err
+      );
 
       setCommentError(
         err.response?.data?.error ||
@@ -525,7 +536,9 @@ export default function TicketDetailsPage() {
   // DELETE COMMENT
   // =========================
 
-  const deleteComment = async (commentId: number) => {
+  const deleteComment = async (
+    commentId: number
+  ) => {
     const confirmed = window.confirm(
       "Are you sure you want to delete this comment?"
     );
@@ -560,7 +573,10 @@ export default function TicketDetailsPage() {
 
       await fetchComments();
     } catch (err: any) {
-      console.error("Error deleting comment:", err);
+      console.error(
+        "Error deleting comment:",
+        err
+      );
 
       setCommentError(
         err.response?.data?.error ||
@@ -576,7 +592,9 @@ export default function TicketDetailsPage() {
   // HELPERS
   // =========================
 
-  const formatDate = (date?: string | null) => {
+  const formatDate = (
+    date?: string | null
+  ) => {
     if (!date) {
       return "—";
     }
@@ -584,7 +602,9 @@ export default function TicketDetailsPage() {
     return new Date(date).toLocaleString();
   };
 
-  const getPriorityClass = (priority: string) => {
+  const getPriorityClass = (
+    priority: string
+  ) => {
     switch (priority) {
       case "Urgent":
         return "bg-red-100 text-red-700";
@@ -603,7 +623,9 @@ export default function TicketDetailsPage() {
     }
   };
 
-  const getStatusClass = (status: string) => {
+  const getStatusClass = (
+    status: string
+  ) => {
     switch (status) {
       case "Open":
         return "bg-blue-100 text-blue-700";
@@ -622,7 +644,9 @@ export default function TicketDetailsPage() {
     }
   };
 
-  const getCommentAuthor = (comment: Comment) => {
+  const getCommentAuthor = (
+    comment: Comment
+  ) => {
     return (
       comment.author?.email ||
       comment.user?.email ||
@@ -675,8 +699,10 @@ export default function TicketDetailsPage() {
 
   return (
     <div className="space-y-6 p-6">
+
       {/* Header */}
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+
         <div>
           <Link
             href="/admin/tickets"
@@ -696,35 +722,55 @@ export default function TicketDetailsPage() {
 
         {/* Ticket Actions */}
         <div className="flex flex-wrap gap-2">
+
           {ticket.status !== "Closed" && (
             <>
-              <button
-                onClick={() => performAction("accept")}
-                disabled={actionLoading}
-                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {actionLoading ? "Processing..." : "Accept"}
-              </button>
+              {/* Accept */}
+              {ticket.status === "Open" &&
+                !ticket.assignee && (
+                  <button
+                    onClick={() =>
+                      performAction("accept")
+                    }
+                    disabled={actionLoading}
+                    className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {actionLoading
+                      ? "Processing..."
+                      : "Accept"}
+                  </button>
+                )}
 
+              {/* Escalate */}
               {!ticket.isEscalated && (
                 <button
-                  onClick={() => performAction("escalate")}
+                  onClick={() =>
+                    performAction("escalate")
+                  }
                   disabled={actionLoading}
                   className="rounded-lg bg-orange-500 px-4 py-2 text-sm font-medium text-white hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  Escalate
+                  {actionLoading
+                    ? "Processing..."
+                    : "Escalate"}
                 </button>
               )}
 
+              {/* Close */}
               <button
-                onClick={() => performAction("close")}
+                onClick={() =>
+                  performAction("close")
+                }
                 disabled={actionLoading}
                 className="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                Close
+                {actionLoading
+                  ? "Processing..."
+                  : "Close"}
               </button>
             </>
           )}
+
         </div>
       </div>
 
@@ -737,10 +783,13 @@ export default function TicketDetailsPage() {
 
       {/* Main Content */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+
         {/* Ticket Description */}
         <div className="lg:col-span-2">
           <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+
             <div className="mb-6 border-b border-gray-100 pb-5">
+
               <p className="mb-2 text-xs font-medium uppercase tracking-wide text-gray-500">
                 Ticket Title
               </p>
@@ -748,9 +797,11 @@ export default function TicketDetailsPage() {
               <h2 className="text-xl font-semibold text-gray-900">
                 {ticket.title}
               </h2>
+
             </div>
 
             <div>
+
               <p className="mb-2 text-xs font-medium uppercase tracking-wide text-gray-500">
                 Description
               </p>
@@ -759,20 +810,25 @@ export default function TicketDetailsPage() {
                 {ticket.description ||
                   "No description provided."}
               </div>
+
             </div>
+
           </div>
         </div>
 
         {/* Ticket Information */}
         <div>
           <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+
             <h2 className="mb-6 text-lg font-semibold text-gray-900">
               Ticket Information
             </h2>
 
             <div className="space-y-5">
+
               {/* Status */}
               <div>
+
                 <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
                   Status
                 </p>
@@ -782,14 +838,17 @@ export default function TicketDetailsPage() {
                     ticket.status
                   )}`}
                 >
-                  {ticket.status === "InProgress"
+                  {ticket.status ===
+                  "InProgress"
                     ? "In Progress"
                     : ticket.status}
                 </span>
+
               </div>
 
               {/* Priority */}
               <div>
+
                 <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
                   Priority
                 </p>
@@ -801,16 +860,19 @@ export default function TicketDetailsPage() {
                 >
                   {ticket.priority}
                 </span>
+
               </div>
 
               {/* Product */}
               <div>
+
                 <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
                   Product
                 </p>
 
                 {ticket.product ? (
                   <div className="mt-1">
+
                     <p className="font-medium text-gray-900">
                       {ticket.product.name ||
                         "Unnamed Product"}
@@ -818,36 +880,44 @@ export default function TicketDetailsPage() {
 
                     {ticket.product.id && (
                       <p className="text-xs text-gray-500">
-                        Product ID: {ticket.product.id}
+                        Product ID:{" "}
+                        {ticket.product.id}
                       </p>
                     )}
+
                   </div>
                 ) : (
                   <p className="mt-1 text-sm text-gray-400">
                     No product assigned
                   </p>
                 )}
+
               </div>
 
               {/* Customer */}
               <div>
+
                 <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
                   Customer
                 </p>
 
                 <p className="mt-1 font-medium text-gray-900">
-                  {ticket.customer?.email || "Unknown"}
+                  {ticket.customer?.email ||
+                    "Unknown"}
                 </p>
 
                 {ticket.customer?.id && (
                   <p className="text-xs text-gray-500">
-                    Customer ID: {ticket.customer.id}
+                    Customer ID:{" "}
+                    {ticket.customer.id}
                   </p>
                 )}
+
               </div>
 
               {/* Assigned Manager */}
               <div>
+
                 <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
                   Assigned To
                 </p>
@@ -861,7 +931,9 @@ export default function TicketDetailsPage() {
                     <select
                       value={selectedManagerId}
                       onChange={(e) => {
-                        setSelectedManagerId(e.target.value);
+                        setSelectedManagerId(
+                          e.target.value
+                        );
                         setAssignError("");
                       }}
                       disabled={
@@ -874,14 +946,16 @@ export default function TicketDetailsPage() {
                         Select a manager
                       </option>
 
-                      {managers.map((manager) => (
-                        <option
-                          key={manager.id}
-                          value={manager.id}
-                        >
-                          {manager.email}
-                        </option>
-                      ))}
+                      {managers.map(
+                        (manager) => (
+                          <option
+                            key={manager.id}
+                            value={manager.id}
+                          >
+                            {manager.email}
+                          </option>
+                        )
+                      )}
                     </select>
 
                     <button
@@ -923,20 +997,26 @@ export default function TicketDetailsPage() {
                     {assignError}
                   </p>
                 )}
+
               </div>
+
             </div>
           </div>
         </div>
+
       </div>
 
       {/* Dates */}
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+
         <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+
           <h2 className="mb-5 text-lg font-semibold text-gray-900">
             Dates
           </h2>
 
           <div className="space-y-4">
+
             <div>
               <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
                 Created
@@ -956,17 +1036,22 @@ export default function TicketDetailsPage() {
                 {formatDate(ticket.updatedAt)}
               </p>
             </div>
+
           </div>
+
         </div>
 
         {/* Escalation */}
         <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+
           <h2 className="mb-5 text-lg font-semibold text-gray-900">
             Escalation
           </h2>
 
           <div className="space-y-4">
+
             <div>
+
               <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
                 Escalated
               </p>
@@ -978,23 +1063,32 @@ export default function TicketDetailsPage() {
                     : "text-gray-700"
                 }`}
               >
-                {ticket.isEscalated ? "Yes" : "No"}
+                {ticket.isEscalated
+                  ? "Yes"
+                  : "No"}
               </p>
+
             </div>
 
             {ticket.isEscalated && (
               <div>
+
                 <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
                   Escalated At
                 </p>
 
                 <p className="mt-1 text-sm text-gray-900">
-                  {formatDate(ticket.escalatedAt)}
+                  {formatDate(
+                    ticket.escalatedAt
+                  )}
                 </p>
+
               </div>
             )}
+
           </div>
         </div>
+
       </div>
 
       {/* Customer Rating */}
@@ -1003,12 +1097,15 @@ export default function TicketDetailsPage() {
       ticket.ratingComment ||
       ticket.ratedAt ? (
         <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+
           <h2 className="mb-5 text-lg font-semibold text-gray-900">
             Customer Rating
           </h2>
 
           <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+
             <div>
+
               <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
                 Rating
               </p>
@@ -1020,9 +1117,11 @@ export default function TicketDetailsPage() {
                   ticket.rating !== undefined &&
                   " / 5"}
               </p>
+
             </div>
 
             <div>
+
               <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
                 Rated At
               </p>
@@ -1030,9 +1129,11 @@ export default function TicketDetailsPage() {
               <p className="mt-1 text-sm text-gray-900">
                 {formatDate(ticket.ratedAt)}
               </p>
+
             </div>
 
             <div>
+
               <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
                 Comment
               </p>
@@ -1041,17 +1142,21 @@ export default function TicketDetailsPage() {
                 {ticket.ratingComment ||
                   "No comment"}
               </p>
+
             </div>
+
           </div>
+
         </div>
       ) : null}
 
-      {/* =========================
-          COMMENTS
-      ========================= */}
+      {/* Comments */}
       <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+
         <div className="mb-6 flex items-center justify-between border-b border-gray-100 pb-5">
+
           <div>
+
             <h2 className="text-lg font-semibold text-gray-900">
               Comments
             </h2>
@@ -1059,6 +1164,7 @@ export default function TicketDetailsPage() {
             <p className="mt-1 text-sm text-gray-500">
               Conversation and updates related to this ticket.
             </p>
+
           </div>
 
           <span className="rounded-full bg-gray-100 px-3 py-1 text-sm font-medium text-gray-700">
@@ -1067,6 +1173,7 @@ export default function TicketDetailsPage() {
               ? "Comment"
               : "Comments"}
           </span>
+
         </div>
 
         {/* Comment Error */}
@@ -1078,6 +1185,7 @@ export default function TicketDetailsPage() {
 
         {/* Add Comment */}
         <div className="mb-8">
+
           <label
             htmlFor="comment"
             className="mb-2 block text-sm font-medium text-gray-700"
@@ -1099,6 +1207,7 @@ export default function TicketDetailsPage() {
           />
 
           <div className="mt-3 flex justify-end">
+
             <button
               onClick={addComment}
               disabled={
@@ -1111,18 +1220,23 @@ export default function TicketDetailsPage() {
                 ? "Sending..."
                 : "Add Comment"}
             </button>
+
           </div>
+
         </div>
 
         {/* Comments List */}
         {commentsLoading ? (
           <div className="py-8 text-center">
+
             <p className="text-sm text-gray-500">
               Loading comments...
             </p>
+
           </div>
         ) : comments.length === 0 ? (
           <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-8 text-center">
+
             <p className="text-sm font-medium text-gray-700">
               No comments yet
             </p>
@@ -1130,35 +1244,44 @@ export default function TicketDetailsPage() {
             <p className="mt-1 text-sm text-gray-500">
               Be the first to add a comment to this ticket.
             </p>
+
           </div>
         ) : (
           <div className="space-y-5">
+
             {comments.map((comment) => (
               <div
                 key={comment.id}
                 className="rounded-lg border border-gray-200 bg-gray-50 p-5"
               >
+
                 {/* Comment Header */}
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+
                   <div>
+
                     <p className="text-sm font-semibold text-gray-900">
                       {getCommentAuthor(comment)}
                     </p>
 
                     <p className="mt-0.5 text-xs text-gray-500">
-                      {formatDate(comment.createdAt)}
+                      {formatDate(
+                        comment.createdAt
+                      )}
 
                       {comment.updatedAt &&
                         comment.updatedAt !==
                           comment.createdAt &&
                         " • Edited"}
                     </p>
+
                   </div>
 
                   {/* Admin Actions */}
                   {editingCommentId !==
                     comment.id && (
                     <div className="flex gap-2">
+
                       <button
                         onClick={() =>
                           startEditingComment(
@@ -1182,14 +1305,17 @@ export default function TicketDetailsPage() {
                       >
                         Delete
                       </button>
+
                     </div>
                   )}
+
                 </div>
 
                 {/* Comment Content / Edit */}
                 {editingCommentId ===
                 comment.id ? (
                   <div className="mt-4">
+
                     <textarea
                       value={editingText}
                       onChange={(e) => {
@@ -1204,6 +1330,7 @@ export default function TicketDetailsPage() {
                     />
 
                     <div className="mt-3 flex justify-end gap-2">
+
                       <button
                         onClick={
                           cancelEditingComment
@@ -1230,18 +1357,24 @@ export default function TicketDetailsPage() {
                           ? "Saving..."
                           : "Save Changes"}
                       </button>
+
                     </div>
+
                   </div>
                 ) : (
                   <div className="mt-4 whitespace-pre-wrap text-sm leading-6 text-gray-700">
                     {comment.content}
                   </div>
                 )}
+
               </div>
             ))}
+
           </div>
         )}
+
       </div>
+
     </div>
   );
 }

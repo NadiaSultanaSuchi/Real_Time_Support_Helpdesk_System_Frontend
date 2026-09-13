@@ -8,26 +8,20 @@ type Ticket = {
   id: number;
   title: string;
   description?: string;
-
   status: string;
   priority: string;
-
   isEscalated?: boolean;
   escalatedAt?: string | null;
-
   createdAt?: string;
   updatedAt?: string;
-
   customer?: {
     id?: number;
     email?: string;
   };
-
   assignee?: {
     id?: number;
     email?: string;
   } | null;
-
   product?: {
     id?: number;
     name?: string;
@@ -46,33 +40,18 @@ const API_URL = "http://127.0.0.1:3000/api";
 
 export default function AdminTicketsPage() {
   const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-  const [loading, setLoading] =
-    useState(true);
+  const [statusFilter, setStatusFilter] = useState("ALL");
+  const [priorityFilter, setPriorityFilter] = useState("ALL");
+  const [search, setSearch] = useState("");
 
-  const [error, setError] =
-    useState("");
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalTickets, setTotalTickets] = useState(0);
 
-  const [statusFilter, setStatusFilter] =
-    useState("ALL");
-
-  const [priorityFilter, setPriorityFilter] =
-    useState("ALL");
-
-  const [search, setSearch] =
-    useState("");
-
-  const [page, setPage] =
-    useState(1);
-
-  const [totalPages, setTotalPages] =
-    useState(1);
-
-  const [totalTickets, setTotalTickets] =
-    useState(0);
-
-  const [actionLoading, setActionLoading] =
-    useState<number | null>(null);
+  const [actionLoading, setActionLoading] = useState<number | null>(null);
 
   // =========================
   // FETCH TICKETS
@@ -83,64 +62,43 @@ export default function AdminTicketsPage() {
       setLoading(true);
       setError("");
 
-      const accessToken =
-        localStorage.getItem(
-          "accessToken"
-        );
+      const accessToken = localStorage.getItem("accessToken");
 
       if (!accessToken) {
-        setError(
-          "You are not logged in."
-        );
+        setError("You are not logged in.");
         return;
       }
 
-      const response =
-        await axios.get<TicketResponse>(
-          `${API_URL}/tickets`,
-          {
-            headers: {
-              Authorization: `Bearer ${accessToken}`,
-            },
+      const response = await axios.get<TicketResponse>(
+        `${API_URL}/tickets`,
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+          params: {
+            status:
+              statusFilter === "ALL"
+                ? undefined
+                : statusFilter,
 
-            params: {
-              status:
-                statusFilter === "ALL"
-                  ? undefined
-                  : statusFilter,
+            priority:
+              priorityFilter === "ALL"
+                ? undefined
+                : priorityFilter,
 
-              priority:
-                priorityFilter === "ALL"
-                  ? undefined
-                  : priorityFilter,
-
-              page,
-
-              limit: 10,
-
-              sortBy: "createdAt",
-
-              order: "DESC",
-            },
-          }
-        );
-
-      setTickets(
-        response.data.data
+            page,
+            limit: 10,
+            sortBy: "createdAt",
+            order: "DESC",
+          },
+        }
       );
 
-      setTotalPages(
-        response.data.totalPages
-      );
-
-      setTotalTickets(
-        response.data.total
-      );
+      setTickets(response.data.data);
+      setTotalPages(response.data.totalPages);
+      setTotalTickets(response.data.total);
     } catch (err: any) {
-      console.error(
-        "Error loading tickets:",
-        err
-      );
+      console.error("Error loading tickets:", err);
 
       setError(
         err.response?.data?.error ||
@@ -154,11 +112,7 @@ export default function AdminTicketsPage() {
 
   useEffect(() => {
     fetchTickets();
-  }, [
-    statusFilter,
-    priorityFilter,
-    page,
-  ]);
+  }, [statusFilter, priorityFilter, page]);
 
   // =========================
   // TICKET ACTION
@@ -166,24 +120,16 @@ export default function AdminTicketsPage() {
 
   const performAction = async (
     ticketId: number,
-    action:
-      | "accept"
-      | "escalate"
-      | "close"
+    action: "accept" | "escalate" | "close"
   ) => {
     try {
       setActionLoading(ticketId);
       setError("");
 
-      const accessToken =
-        localStorage.getItem(
-          "accessToken"
-        );
+      const accessToken = localStorage.getItem("accessToken");
 
       if (!accessToken) {
-        setError(
-          "You are not logged in."
-        );
+        setError("You are not logged in.");
         return;
       }
 
@@ -218,46 +164,36 @@ export default function AdminTicketsPage() {
   // SEARCH
   // =========================
 
-  const filteredTickets =
-    tickets.filter((ticket) => {
-      const value =
-        search.toLowerCase();
+  const filteredTickets = tickets.filter((ticket) => {
+    const value = search.toLowerCase();
 
-      return (
-        ticket.title
-          ?.toLowerCase()
-          .includes(value) ||
-        ticket.customer?.email
-          ?.toLowerCase()
-          .includes(value) ||
-        ticket.product?.name
-          ?.toLowerCase()
-          .includes(value) ||
-        String(ticket.id).includes(
-          value
-        )
-      );
-    });
+    return (
+      ticket.title
+        ?.toLowerCase()
+        .includes(value) ||
+      ticket.customer?.email
+        ?.toLowerCase()
+        .includes(value) ||
+      ticket.product?.name
+        ?.toLowerCase()
+        .includes(value) ||
+      String(ticket.id).includes(value)
+    );
+  });
 
   // =========================
   // HELPERS
   // =========================
 
-  const formatDate = (
-    date?: string
-  ) => {
+  const formatDate = (date?: string) => {
     if (!date) {
-      return "—";
+      return "-";
     }
 
-    return new Date(
-      date
-    ).toLocaleDateString();
+    return new Date(date).toLocaleDateString();
   };
 
-  const getPriorityClass = (
-    priority: string
-  ) => {
+  const getPriorityClass = (priority: string) => {
     switch (priority) {
       case "Urgent":
         return "bg-red-100 text-red-700";
@@ -276,9 +212,7 @@ export default function AdminTicketsPage() {
     }
   };
 
-  const getStatusClass = (
-    status: string
-  ) => {
+  const getStatusClass = (status: string) => {
     switch (status) {
       case "Open":
         return "bg-blue-100 text-blue-700";
@@ -352,8 +286,7 @@ export default function AdminTicketsPage() {
             {
               tickets.filter(
                 (ticket) =>
-                  ticket.status ===
-                  "InProgress"
+                  ticket.status === "InProgress"
               ).length
             }
           </p>
@@ -368,12 +301,12 @@ export default function AdminTicketsPage() {
             {
               tickets.filter(
                 (ticket) =>
-                  ticket.priority ===
-                  "Urgent"
+                  ticket.priority === "Urgent"
               ).length
             }
           </p>
         </div>
+
       </div>
 
       {/* Filters */}
@@ -391,9 +324,7 @@ export default function AdminTicketsPage() {
               type="text"
               value={search}
               onChange={(e) =>
-                setSearch(
-                  e.target.value
-                )
+                setSearch(e.target.value)
               }
               placeholder="Search ticket, customer or product..."
               className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
@@ -409,9 +340,7 @@ export default function AdminTicketsPage() {
             <select
               value={statusFilter}
               onChange={(e) => {
-                setStatusFilter(
-                  e.target.value
-                );
+                setStatusFilter(e.target.value);
                 setPage(1);
               }}
               className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
@@ -447,9 +376,7 @@ export default function AdminTicketsPage() {
             <select
               value={priorityFilter}
               onChange={(e) => {
-                setPriorityFilter(
-                  e.target.value
-                );
+                setPriorityFilter(e.target.value);
                 setPage(1);
               }}
               className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
@@ -475,6 +402,7 @@ export default function AdminTicketsPage() {
               </option>
             </select>
           </div>
+
         </div>
       </div>
 
@@ -555,18 +483,14 @@ export default function AdminTicketsPage() {
                       {/* Ticket */}
                       <td className="whitespace-nowrap px-6 py-4">
 
-                        <div className="flex items-center gap-3">
+                        <div>
+                          <p className="text-xs text-gray-500">
+                            #{ticket.id}
+                          </p>
 
-                          <div>
-                            <p className="text-xs text-gray-500">
-                              #{ticket.id}
-                            </p>
-
-                            <p className="max-w-[220px] truncate font-medium text-gray-900">
-                              {ticket.title}
-                            </p>
-                          </div>
-
+                          <p className="max-w-[220px] truncate font-medium text-gray-900">
+                            {ticket.title}
+                          </p>
                         </div>
 
                       </td>
@@ -592,8 +516,7 @@ export default function AdminTicketsPage() {
 
                             {ticket.product.id && (
                               <p className="text-xs text-gray-500">
-                                ID:{" "}
-                                {ticket.product.id}
+                                ID: {ticket.product.id}
                               </p>
                             )}
                           </div>
@@ -669,27 +592,28 @@ export default function AdminTicketsPage() {
                           </Link>
 
                           {/* Accept */}
-                          {ticket.status !==
-                            "Closed" && (
-                            <button
-                              onClick={() =>
-                                performAction(
-                                  ticket.id,
-                                  "accept"
-                                )
-                              }
-                              disabled={
-                                actionLoading ===
+                          {ticket.status ===
+                            "Open" &&
+                            !ticket.assignee && (
+                              <button
+                                onClick={() =>
+                                  performAction(
+                                    ticket.id,
+                                    "accept"
+                                  )
+                                }
+                                disabled={
+                                  actionLoading ===
+                                  ticket.id
+                                }
+                                className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                              >
+                                {actionLoading ===
                                 ticket.id
-                              }
-                              className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-                            >
-                              {actionLoading ===
-                              ticket.id
-                                ? "..."
-                                : "Accept"}
-                            </button>
-                          )}
+                                  ? "..."
+                                  : "Accept"}
+                              </button>
+                            )}
 
                           {/* Escalate */}
                           {ticket.status !==
@@ -708,7 +632,10 @@ export default function AdminTicketsPage() {
                                 }
                                 className="rounded-lg bg-orange-500 px-3 py-2 text-xs font-medium text-white hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-50"
                               >
-                                Escalate
+                                {actionLoading ===
+                                ticket.id
+                                  ? "..."
+                                  : "Escalate"}
                               </button>
                             )}
 
@@ -728,7 +655,10 @@ export default function AdminTicketsPage() {
                               }
                               className="rounded-lg bg-green-600 px-3 py-2 text-xs font-medium text-white hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
                             >
-                              Close
+                              {actionLoading ===
+                              ticket.id
+                                ? "..."
+                                : "Close"}
                             </button>
                           )}
 
@@ -768,12 +698,8 @@ export default function AdminTicketsPage() {
 
               <button
                 onClick={() =>
-                  setPage(
-                    (current) =>
-                      Math.max(
-                        1,
-                        current - 1
-                      )
+                  setPage((current) =>
+                    Math.max(1, current - 1)
                   )
                 }
                 disabled={page === 1}
@@ -784,17 +710,14 @@ export default function AdminTicketsPage() {
 
               <button
                 onClick={() =>
-                  setPage(
-                    (current) =>
-                      Math.min(
-                        totalPages,
-                        current + 1
-                      )
+                  setPage((current) =>
+                    Math.min(
+                      totalPages,
+                      current + 1
+                    )
                   )
                 }
-                disabled={
-                  page === totalPages
-                }
+                disabled={page === totalPages}
                 className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Next
