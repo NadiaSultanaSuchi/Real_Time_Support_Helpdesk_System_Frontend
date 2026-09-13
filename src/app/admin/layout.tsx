@@ -16,28 +16,23 @@ export default function AdminLayout({
   useEffect(() => {
     const accessToken = localStorage.getItem("accessToken");
 
-    // No access token
     if (!accessToken) {
       router.replace("/login");
       return;
     }
 
     try {
-      // Decode JWT payload
       const payload = JSON.parse(
         atob(accessToken.split(".")[1])
       );
 
-      // Check admin role
       if (payload.role !== "Admin") {
         router.replace("/login");
         return;
       }
 
-      // Token exists and user is Admin
       setAuthorized(true);
     } catch {
-      // Invalid token
       localStorage.removeItem("accessToken");
       localStorage.removeItem("refreshToken");
 
@@ -45,7 +40,13 @@ export default function AdminLayout({
     }
   }, [router]);
 
-  // Don't show the admin dashboard until authentication is checked
+  const handleLogout = () => {
+    localStorage.removeItem("accessToken");
+    localStorage.removeItem("refreshToken");
+
+    router.replace("/login");
+  };
+
   if (!authorized) {
     return null;
   }
@@ -110,7 +111,7 @@ export default function AdminLayout({
               Users
             </Link>
 
-
+            {/* Manager Requests */}
             {/* <Link
               href="/admin/managers/requests"
               className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-slate-300 transition hover:bg-slate-800 hover:text-white"
@@ -118,7 +119,6 @@ export default function AdminLayout({
               <span className="text-lg">🙏🥺</span>
               Manager Requests
             </Link> */}
-
 
             <Link
               href="/admin/products"
@@ -128,6 +128,7 @@ export default function AdminLayout({
               Products
             </Link>
 
+            {/* Reports */}
             {/* <Link
               href="/admin/reports"
               className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-slate-300 transition hover:bg-slate-800 hover:text-white"
@@ -152,20 +153,31 @@ export default function AdminLayout({
 
         {/* Sidebar bottom */}
         <div className="border-t border-slate-800 p-4">
-          <div className="flex items-center gap-3 rounded-xl bg-slate-900 p-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-600 text-sm font-semibold">
-              A
+          <div className="rounded-xl bg-slate-900 p-3">
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-600 text-sm font-semibold">
+                A
+              </div>
+
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium">
+                  Administrator
+                </p>
+
+                <p className="truncate text-xs text-slate-500">
+                  Admin account
+                </p>
+              </div>
             </div>
 
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium">
-                Administrator
-              </p>
-
-              <p className="truncate text-xs text-slate-500">
-                Admin account
-              </p>
-            </div>
+            {/* Logout */}
+            <button
+              onClick={handleLogout}
+              className="mt-3 flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-slate-400 transition hover:bg-red-500/10 hover:text-red-400"
+            >
+              <span className="text-lg">↪</span>
+              Logout
+            </button>
           </div>
         </div>
       </aside>
@@ -186,11 +198,11 @@ export default function AdminLayout({
 
           <div className="flex items-center gap-4">
             {/* Notification */}
-            <button className="relative flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-50">
+            {/* <button className="relative flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-50">
               <span className="text-lg">♧</span>
 
               <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-blue-600" />
-            </button>
+            </button> */}
 
             {/* Profile */}
             <div className="flex items-center gap-3 border-l border-slate-200 pl-4">
