@@ -21,6 +21,7 @@ export default function ManagerLayout({ children }: { children: React.ReactNode 
         name: "",
         email: "",
     })
+    const [searchText, setSearchText] = useState("");
 
     useEffect(() => {
 
@@ -55,11 +56,15 @@ export default function ManagerLayout({ children }: { children: React.ReactNode 
     const navItems = [
         { href: "/manager", label: "Dashboard" },
         { href: "/manager/assigned", label: "Assigned Tickets" },
-        { href: "/manager/tickets", label: "Ticket Details" },
         { href: "/manager/team", label: "Team Management" },
-        { href: "/manager/reports", label: "Reports" },
         { href: "/manager/customers", label: "Customers" }
     ];
+
+    const handleSearch = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === "Enter" && searchText.trim()) {
+            router.push(`/manager/assigned?q=${encodeURIComponent(searchText.trim())}`);
+        }
+    }
 
     return (
         <div className="min-h-screen bg-slate-50">
@@ -116,6 +121,9 @@ export default function ManagerLayout({ children }: { children: React.ReactNode 
                         type="text"
                         placeholder="Search tickets, users, or keywords..."
                         className="max-w-md"
+                        value={searchText}
+                        onChange={(e) => setSearchText(e.target.value)}
+                        onKeyDown={handleSearch}
                     />
 
                     <div className="flex items-center gap-3">

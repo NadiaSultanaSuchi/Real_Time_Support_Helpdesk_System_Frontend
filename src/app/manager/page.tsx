@@ -13,6 +13,7 @@ import {
     TableCell,
 } from "@/components/ui/table";
 import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { Ticket, FileText, CheckCircle2, Clock, Users, UserCheck } from "lucide-react";
 
 function statusColor(status: string) {
     if (status === "Resolved") return "bg-green-100 text-green-700";
@@ -41,6 +42,7 @@ export default function ManagerDashboard() {
     const [profile, setProfile] = useState({
         id: 0,
         name: "",
+        email: "",
         role: "",
     })
 
@@ -55,7 +57,10 @@ export default function ManagerDashboard() {
     const [ticketStatusBreakdown, setTicketStatusBreakdown] = useState<any[]>([]);
     const [recentTickets, setRecentTickets] = useState<any[]>([]);
     const [teamMembersCount, setTeamMembersCount] = useState(0);
-    const [avgResponseTimeMinutes, setAvgResponseTimeMinutes] = useState(0);
+    const [totalCustomers, setTotalCustomers] = useState(0);
+    const [customerSatisfaction, setCustomerSatisfaction] = useState<any>({
+        overallAvgRating: null,
+    })
 
     const [loading, setLoading] = useState(true);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -77,7 +82,8 @@ export default function ManagerDashboard() {
                 setTicketStatusBreakdown(response.data.ticketStatusBreakdown);
                 setRecentTickets(response.data.recentTickets);
                 setTeamMembersCount(response.data.teamMembersCount);
-                setAvgResponseTimeMinutes(response.data.avgResponseTimeMinutes);
+                setTotalCustomers(response.data.totalCustomers);
+                setCustomerSatisfaction(response.data.customerSatisfaction);
 
                 setLoading(false);
             }
@@ -104,159 +110,203 @@ export default function ManagerDashboard() {
         return <p className="text-red-600">{errorMessage}</p>
     }
 
+    const totalStatusCount = ticketStatusBreakdown.reduce((sum, e) => sum + e.count, 0);
+
     return (
-        <div>
+        <div className="space-y-4">
 
-            <h1 className="text-3xl font-bold">MANAGER DASHBOARD</h1><br />
+            <h1 className="text-2xl font-bold">MANAGER DASHBOARD</h1>
 
-            <div className="grid grid-cols-4 gap-6">
+            <div className="grid grid-cols-3 gap-3">
 
-                <Card>
-                    <CardContent className="pt-6">
-                        <p className="text-sm text-slate-500">Total Tickets</p>
-                        <p className="text-3xl font-bold">{stats.totalTickets.value}</p>
-                        <p className={stats.totalTickets.changePct >= 0 ? "text-xs text-green-600" : "text-xs text-red-600"}>
-                            {stats.totalTickets.changePct >= 0 ? "↑" : "↓"} {stats.totalTickets.changePct}% from last month
-                        </p>
-                    </CardContent>
+                <Card className="flex flex-col items-center justify-center gap-1.5 py-4">
+                    <p className="text-sm font-medium">{profile.email}</p>
+                    <p className="text-xs text-slate-500">{profile.role}</p>
+                    <p className="text-xs text-slate-500">
+                        Satisfaction {customerSatisfaction.overallAvgRating != null ? `${customerSatisfaction.overallAvgRating}/5` : "not rated yet"}
+                    </p>
                 </Card>
 
-                <Card>
-                    <CardContent className="pt-6">
-                        <p className="text-sm text-slate-500">New Tickets</p>
-                        <p className="text-3xl font-bold">{stats.newTickets.value}</p>
-                        <p className={stats.newTickets.changePct >= 0 ? "text-xs text-green-600" : "text-xs text-red-600"}>
-                            {stats.newTickets.changePct >= 0 ? "↑" : "↓"} {stats.newTickets.changePct}% from last month
-                        </p>
-                    </CardContent>
-                </Card>
+                <div className="col-span-2 grid grid-cols-3 gap-2">
 
-                <Card>
-                    <CardContent className="pt-6">
-                        <p className="text-sm text-slate-500">Resolved Tickets</p>
-                        <p className="text-3xl font-bold">{stats.resolvedTickets.value}</p>
-                        <p className={stats.resolvedTickets.changePct >= 0 ? "text-xs text-green-600" : "text-xs text-red-600"}>
-                            {stats.resolvedTickets.changePct >= 0 ? "↑" : "↓"} {stats.resolvedTickets.changePct}% from last month
-                        </p>
-                    </CardContent>
-                </Card>
+                    <Card className="border-none bg-gradient-to-br from-violet-50 to-white">
+                        <CardContent className="flex items-start gap-2 py-2.5">
+                            <div className="rounded-lg bg-violet-100 p-1.5">
+                                <Ticket className="h-3.5 w-3.5 text-violet-600" />
+                            </div>
+                            <div>
+                                <p className="text-xs text-slate-500">Total Tickets</p>
+                                <p className="text-base font-bold leading-tight">{stats.totalTickets.value}</p>
+                            </div>
+                        </CardContent>
+                    </Card>
 
-                <Card>
-                    <CardContent className="pt-6">
-                        <p className="text-sm text-slate-500">In Progress</p>
-                        <p className="text-3xl font-bold">{stats.inProgressTickets.value}</p>
-                        <p className={stats.inProgressTickets.changePct >= 0 ? "text-xs text-green-600" : "text-xs text-red-600"}>
-                            {stats.inProgressTickets.changePct >= 0 ? "↑" : "↓"} {stats.inProgressTickets.changePct}% from last month
-                        </p>
-                    </CardContent>
-                </Card>
+                    <Card className="border-none bg-gradient-to-br from-sky-50 to-white">
+                        <CardContent className="flex items-start gap-2 py-2.5">
+                            <div className="rounded-lg bg-sky-100 p-1.5">
+                                <FileText className="h-3.5 w-3.5 text-sky-600" />
+                            </div>
+                            <div>
+                                <p className="text-xs text-slate-500">New Tickets</p>
+                                <p className="text-base font-bold leading-tight">{stats.newTickets.value}</p>
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    <Card className="border-none bg-gradient-to-br from-emerald-50 to-white">
+                        <CardContent className="flex items-start gap-2 py-2.5">
+                            <div className="rounded-lg bg-emerald-100 p-1.5">
+                                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                            </div>
+                            <div>
+                                <p className="text-xs text-slate-500">Resolved</p>
+                                <p className="text-base font-bold leading-tight">{stats.resolvedTickets.value}</p>
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    <Card className="border-none bg-gradient-to-br from-amber-50 to-white">
+                        <CardContent className="flex items-start gap-2 py-2.5">
+                            <div className="rounded-lg bg-amber-100 p-1.5">
+                                <Clock className="h-3.5 w-3.5 text-amber-600" />
+                            </div>
+                            <div>
+                                <p className="text-xs text-slate-500">In Progress</p>
+                                <p className="text-base font-bold leading-tight">{stats.inProgressTickets.value}</p>
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    <Card className="border-none bg-gradient-to-br from-pink-50 to-white">
+                        <CardContent className="flex items-start gap-2 py-2.5">
+                            <div className="rounded-lg bg-pink-100 p-1.5">
+                                <Users className="h-3.5 w-3.5 text-pink-600" />
+                            </div>
+                            <div>
+                                <p className="text-xs text-slate-500">Total Customers</p>
+                                <p className="text-base font-bold leading-tight">{totalCustomers}</p>
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    <Card className="border-none bg-gradient-to-br from-indigo-50 to-white">
+                        <CardContent className="flex items-start gap-2 py-2.5">
+                            <div className="rounded-lg bg-indigo-100 p-1.5">
+                                <UserCheck className="h-3.5 w-3.5 text-indigo-600" />
+                            </div>
+                            <div>
+                                <p className="text-xs text-slate-500">Team Members</p>
+                                <p className="text-base font-bold leading-tight">{teamMembersCount}</p>
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                </div>
 
             </div>
 
-            <br />
+            <div className="grid grid-cols-2 gap-3">
 
-            <Card>
-                <CardHeader>
-                    <CardTitle>Ticket Volume (This Week)</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <ResponsiveContainer width="100%" height={220}>
-                        <BarChart data={ticketVolume}>
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis dataKey="day" />
-                            <YAxis />
-                            <Tooltip />
-                            <Bar dataKey="count" fill="#60a5fa" />
-                        </BarChart>
-                    </ResponsiveContainer>
-                </CardContent>
-            </Card>
-
-            <br />
-
-            <div className="grid grid-cols-3 gap-6">
-
-                <Card className="col-span-2">
-                    <CardHeader>
-                        <CardTitle>Recent Tickets</CardTitle>
+                <Card>
+                    <CardHeader className="py-2">
+                        <CardTitle className="text-sm">Ticket Volume (This Week)</CardTitle>
                     </CardHeader>
-                    <CardContent>
-                        {recentTickets.length === 0 ? (
-                            <p className="text-sm text-slate-500">No tickets yet</p>
-                        ) : (
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>ID</TableHead>
-                                        <TableHead>Subject</TableHead>
-                                        <TableHead>User</TableHead>
-                                        <TableHead>Status</TableHead>
-                                        <TableHead>Priority</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {recentTickets.map((ticket) => (
-                                        <TableRow key={ticket.id}>
-                                            <TableCell>#TKT-{ticket.id}</TableCell>
-                                            <TableCell>{ticket.title}</TableCell>
-                                            <TableCell>{ticket.customerName}</TableCell>
-                                            <TableCell>
-                                                <Badge className={statusColor(ticket.status)}>{ticket.status}</Badge>
-                                            </TableCell>
-                                            <TableCell>
-                                                <Badge className={priorityColor(ticket.priority)}>{ticket.priority}</Badge>
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        )}
+                    <CardContent className="pb-3">
+                        <ResponsiveContainer width="100%" height={240}>
+                            <BarChart data={ticketVolume}>
+                                <CartesianGrid strokeDasharray="3 3" />
+                                <XAxis dataKey="day" fontSize={12} />
+                                <YAxis fontSize={12} width={24} />
+                                <Tooltip />
+                                <Bar dataKey="count" fill="#60a5fa" radius={[4, 4, 0, 0]} />
+                            </BarChart>
+                        </ResponsiveContainer>
                     </CardContent>
                 </Card>
 
                 <Card>
-                    <CardHeader>
-                        <CardTitle>Ticket Status</CardTitle>
+                    <CardHeader className="py-2">
+                        <CardTitle className="text-sm">Ticket Status</CardTitle>
                     </CardHeader>
-                    <CardContent className="flex flex-col items-center">
-
-                        <ResponsiveContainer width={200} height={200}>
-                            <PieChart>
-                                <Pie
-                                    data={ticketStatusBreakdown}
-                                    dataKey="count"
-                                    nameKey="status"
-                                    innerRadius={60}
-                                    outerRadius={90}
-                                    paddingAngle={2}
-                                >
-                                    {ticketStatusBreakdown.map((entry) => (
-                                        <Cell key={entry.status} fill={donutColors[entry.status] ?? "#cbd5e1"} />
-                                    ))}
-                                </Pie>
-                                <Tooltip />
-                            </PieChart>
-                        </ResponsiveContainer>
-
-                        <div className="mt-4 w-full space-y-2">
+                    <CardContent className="flex flex-col items-center pb-3">
+                        <div className="relative">
+                            <ResponsiveContainer width={190} height={190}>
+                                <PieChart>
+                                    <Pie
+                                        data={ticketStatusBreakdown}
+                                        dataKey="count"
+                                        nameKey="status"
+                                        innerRadius={58}
+                                        outerRadius={85}
+                                        paddingAngle={2}
+                                    >
+                                        {ticketStatusBreakdown.map((entry) => (
+                                            <Cell key={entry.status} fill={donutColors[entry.status] ?? "#cbd5e1"} />
+                                        ))}
+                                    </Pie>
+                                    <Tooltip />
+                                </PieChart>
+                            </ResponsiveContainer>
+                            <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+                                <span className="text-xl font-bold">{totalStatusCount}</span>
+                                <span className="text-xs text-slate-500">Total</span>
+                            </div>
+                        </div>
+                        <div className="mt-1 flex flex-wrap justify-center gap-3">
                             {ticketStatusBreakdown.map((entry) => (
-                                <div key={entry.status} className="flex items-center justify-between text-sm">
-                                    <span className="flex items-center gap-2 text-slate-600">
-                                        <span
-                                            className="h-2.5 w-2.5 rounded-full"
-                                            style={{ backgroundColor: donutColors[entry.status] ?? "#cbd5e1" }}
-                                        />
-                                        {entry.status}
-                                    </span>
-                                    <span className="font-medium">{entry.count}</span>
-                                </div>
+                                <span key={entry.status} className="flex items-center gap-1.5 text-xs text-slate-600">
+                                    <span
+                                        className="h-2 w-2 rounded-full"
+                                        style={{ backgroundColor: donutColors[entry.status] ?? "#cbd5e1" }}
+                                    />
+                                    {entry.status} {entry.count}
+                                </span>
                             ))}
                         </div>
-
                     </CardContent>
                 </Card>
 
             </div>
+
+            <Card>
+                <CardHeader className="py-2">
+                    <CardTitle className="text-sm">Recent Tickets</CardTitle>
+                </CardHeader>
+                <CardContent className="max-h-64 overflow-y-auto pb-3">
+                    {recentTickets.length === 0 ? (
+                        <p className="text-sm text-slate-500">No tickets yet</p>
+                    ) : (
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead className="text-xs">ID</TableHead>
+                                    <TableHead className="text-xs">Subject</TableHead>
+                                    <TableHead className="text-xs">User</TableHead>
+                                    <TableHead className="text-xs">Assigned To</TableHead>
+                                    <TableHead className="text-xs">Status</TableHead>
+                                    <TableHead className="text-xs">Priority</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {recentTickets.map((ticket) => (
+                                    <TableRow key={ticket.id}>
+                                        <TableCell className="text-xs">#TKT-{ticket.id}</TableCell>
+                                        <TableCell className="text-xs">{ticket.title}</TableCell>
+                                        <TableCell className="text-xs">{ticket.customerName}</TableCell>
+                                        <TableCell className="text-xs">{ticket.assigneeName}</TableCell>
+                                        <TableCell>
+                                            <Badge className={`${statusColor(ticket.status)} text-xs`}>{ticket.status}</Badge>
+                                        </TableCell>
+                                        <TableCell>
+                                            <Badge className={`${priorityColor(ticket.priority)} text-xs`}>{ticket.priority}</Badge>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    )}
+                </CardContent>
+            </Card>
 
         </div>
     );

@@ -4,6 +4,7 @@ import axios from 'axios';
 import { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
     Table,
     TableHeader,
@@ -18,13 +19,14 @@ export default function TeamPage() {
     const [team, setTeam] = useState([]);
     const [loading, setLoading] = useState(true);
     const [errorMessage, setErrorMessage] = useState(null);
+    const [sendingTo, setSendingTo] = useState(null);
+
+    const token = typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
 
     useEffect(() => {
 
         const loadTeam = async () => {
             try {
-                const token = localStorage.getItem("accessToken");
-
                 const response = await axios.get("http://localhost:3000/api/users/team", {
                     headers: { Authorization: `Bearer ${token}` }
                 });
@@ -35,7 +37,7 @@ export default function TeamPage() {
                 if (error.response) {
                     setErrorMessage(error.response.data?.error || "Could not load team");
                 } else {
-                    setErrorMessage("Could not reach the server");
+                    setErrorMessage("Could not reach the server. Is the backend running?");
                 }
             }
             finally {
@@ -46,6 +48,27 @@ export default function TeamPage() {
         loadTeam();
 
     }, [])
+
+    const handleMessage = async (member) => {
+        const message = window.prompt(`Message to ${member.name || member.email}:`);
+        if (!message || !message.trim()) return;
+
+        setSendingTo(member.id);
+        try {
+            await axios.patch(
+                `http://localhost:3000/api/users/team/${member.id}/notify`,
+                { message },
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
+            alert("Message sent.");
+        }
+        catch (error) {
+            alert(error.response?.data?.error || "Could not send message");
+        }
+        finally {
+            setSendingTo(null);
+        }
+    }
 
     if (loading) {
         return <p>Loading...</p>
@@ -109,6 +132,7 @@ export default function TeamPage() {
                                     <TableHead>Assigned</TableHead>
                                     <TableHead>In Progress</TableHead>
                                     <TableHead>Resolved</TableHead>
+                                    <TableHead>Actions</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -124,6 +148,16 @@ export default function TeamPage() {
                                         <TableCell>{member.assignedTickets}</TableCell>
                                         <TableCell>{member.inProgressTickets}</TableCell>
                                         <TableCell>{member.resolvedTickets}</TableCell>
+                                        <TableCell>
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => handleMessage(member)}
+                                                disabled={sendingTo === member.id}
+                                            >
+                                                Message
+                                            </Button>
+                                        </TableCell>
                                     </TableRow>
                                 ))}
                             </TableBody>
