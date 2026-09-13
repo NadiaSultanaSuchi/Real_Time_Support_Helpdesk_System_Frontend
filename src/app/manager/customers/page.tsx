@@ -5,7 +5,6 @@ import { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
     Table,
     TableHeader,
@@ -16,113 +15,99 @@ import {
 } from "@/components/ui/table";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
-function statusColor(status: string) {
+function statusColor(status) {
     if (status === "Resolved") return "bg-green-100 text-green-700";
     if (status === "InProgress") return "bg-amber-100 text-amber-700";
     if (status === "Closed") return "bg-slate-200 text-slate-600";
-    return "bg-blue-100 text-blue-700";
+    return "bg-blue-100 text-blue-700"; // Open
 }
 
-function averageRating(tickets: any[]) {
-    const rated = tickets.filter((t: any) => t.rating != null);
+function averageRating(tickets) {
+    const rated = tickets.filter((t) => t.rating != null);
     if (rated.length === 0) return null;
-    const sum = rated.reduce((total: number, t: any) => total + t.rating, 0);
+    const sum = rated.reduce((total, t) => total + t.rating, 0);
     return Number((sum / rated.length).toFixed(1));
+}
+
+// Simple, rule-based flagging — NOT real AI/ML.
+// Just checks a few patterns that could suggest spam/abuse,
+// so a manager can look closer, not to auto-ban anyone.
+function checkSuspicious(tickets) {
+    const reasons = [];
+
+    if (tickets.length >= 5) {
+        reasons.push("High ticket volume (5+)");
+    }
+
+    const titleCounts = {};
+    tickets.forEach((t) => {
+        titleCounts[t.title] = (titleCounts[t.title] || 0) + 1;
+    });
+    const hasDuplicateTitle = Object.values(titleCounts).some((count) => count >= 2);
+    if (hasDuplicateTitle) {
+        reasons.push("Duplicate ticket titles");
+    }
+
+    const sortedDates = tickets
+        .map((t) => new Date(t.createdAt).getTime())
+        .sort((a, b) => a - b);
+
+    for (let i = 1; i < sortedDates.length; i++) {
+        const gapHours = (sortedDates[i] - sortedDates[i - 1]) / (1000 * 60 * 60);
+        if (gapHours < 1) {
+            reasons.push("Multiple tickets within 1 hour");
+            break;
+        }
+    }
+
+    return reasons;
 }
 
 export default function CustomersPage() {
 
-    const [customers, setCustomers] = useState<any[]>([]);
-    const [tickets, setTickets] = useState<any[]>([]);
-    const [selectedId, setSelectedId] = useState<number | null>(null);
-    const [editEmail, setEditEmail] = useState("");
-    const [saving, setSaving] = useState(false);
+    const [customers, setCustomers] = useState([]);
+    const [tickets, setTickets] = useState([]);
+    const [selectedId, setSelectedId] = useState(null);
 
     const [loading, setLoading] = useState(true);
-    const [errorMessage, setErrorMessage] = useState<string | null>(null);
+    const [errorMessage, setErrorMessage] = useState(null);
 
     const token = typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
 
-    const loadData = async () => {
-        try {
-            const [customersRes, ticketsRes] = await Promise.all([
-                axios.get("http://localhost:3000/api/users/customers", {
-                    headers: { Authorization: `Bearer ${token}` }
-                }),
-                axios.get("http://localhost:3000/api/tickets?limit=100", {
-                    headers: { Authorization: `Bearer ${token}` }
-                }),
-            ]);
+    useEffect(() => {
 
-            setCustomers(customersRes.data);
-            setTickets(ticketsRes.data.data);
-            setErrorMessage(null);
-        }
-        catch (error: any) {
-            if (error.response) {
-                setErrorMessage(error.response.data?.error || "Could not load customers");
-            } else {
-                setErrorMessage("Could not reach the server. Is the backend running?");
+        const loadData = async () => {
+            try {
+                const [customersRes, ticketsRes] = await Promise.all([
+                    axios.get("http://localhost:3000/api/users/customers", {
+                        headers: { Authorization: `Bearer ${token}` }
+                    }),
+                    axios.get("http://localhost:3000/api/tickets?limit=100", {
+                        headers: { Authorization: `Bearer ${token}` }
+                    }),
+                ]);
+
+                setCustomers(customersRes.data);
+                setTickets(ticketsRes.data.data);
+            }
+            catch (error) {
+                if (error.response) {
+                    setErrorMessage(error.response.data?.error || "Could not load customers");
+                } else {
+                    setErrorMessage("Could not reach the server. Is the backend running?");
+                }
+            }
+            finally {
+                setLoading(false);
             }
         }
-        finally {
-            setLoading(false);
-        }
-    }
 
-    useEffect(() => {
         loadData();
+
     }, [])
 
-    const selectedCustomer = customers.find((c) => c.id === selectedId);
-
-    useEffect(() => {
-        if (selectedCustomer) {
-            setEditEmail(selectedCustomer.email);
-        }
-    }, [selectedId])
-
-    const ticketsFor = (customerId: number) => {
+    const ticketsFor = (customerId) => {
         return tickets.filter((t) => t.customer?.id === customerId);
-    }
-
-    const handleSaveEmail = async () => {
-        if (!selectedCustomer || editEmail === selectedCustomer.email) return;
-
-        setSaving(true);
-        try {
-            await axios.patch(`http://localhost:3000/api/users/customers/${selectedCustomer.id}`, { email: editEmail }, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
-            await loadData();
-        }
-        catch (error: any) {
-            alert(error.response?.data?.error || "Could not update customer");
-        }
-        finally {
-            setSaving(false);
-        }
-    }
-
-    const handleDelete = async () => {
-        if (!selectedCustomer) return;
-        const confirmed = confirm(`Delete ${selectedCustomer.email}? This cannot be undone.`);
-        if (!confirmed) return;
-
-        setSaving(true);
-        try {
-            await axios.delete(`http://localhost:3000/api/users/customers/${selectedCustomer.id}`, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
-            setSelectedId(null);
-            await loadData();
-        }
-        catch (error: any) {
-            alert(error.response?.data?.error || "Could not delete customer");
-        }
-        finally {
-            setSaving(false);
-        }
     }
 
     if (loading) {
@@ -132,6 +117,8 @@ export default function CustomersPage() {
     if (errorMessage) {
         return <p className="text-red-600">{errorMessage}</p>
     }
+
+    const selectedCustomer = customers.find((c) => c.id === selectedId);
 
     const satisfactionData = customers
         .map((c) => ({
@@ -187,32 +174,46 @@ export default function CustomersPage() {
                                         <TableHead>Email</TableHead>
                                         <TableHead>Tickets</TableHead>
                                         <TableHead>Satisfaction</TableHead>
+                                        <TableHead>Flag</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
                                     {customers.map((customer) => {
                                         const custTickets = ticketsFor(customer.id);
                                         const avg = averageRating(custTickets);
+                                        const suspiciousReasons = checkSuspicious(custTickets);
 
                                         return (
-                                            <TableRow
-                                                key={customer.id}
-                                                onClick={() => setSelectedId(customer.id)}
-                                                className={
-                                                    selectedId === customer.id
-                                                        ? "cursor-pointer bg-blue-50"
-                                                        : "cursor-pointer"
-                                                }
-                                            >
+                                            <TableRow key={customer.id}>
                                                 <TableCell>#{customer.id}</TableCell>
                                                 <TableCell>{customer.name || "—"}</TableCell>
                                                 <TableCell>{customer.email}</TableCell>
-                                                <TableCell>{custTickets.length} ticket(s)</TableCell>
+                                                <TableCell>
+                                                    <Button
+                                                        variant="link"
+                                                        className="p-0 h-auto"
+                                                        onClick={() => setSelectedId(customer.id)}
+                                                    >
+                                                        {custTickets.length} ticket(s)
+                                                    </Button>
+                                                </TableCell>
                                                 <TableCell>
                                                     {avg === null ? (
                                                         <span className="text-slate-400">Not rated</span>
                                                     ) : (
                                                         <span>⭐ {avg} / 5</span>
+                                                    )}
+                                                </TableCell>
+                                                <TableCell>
+                                                    {suspiciousReasons.length === 0 ? (
+                                                        <span className="text-slate-300">—</span>
+                                                    ) : (
+                                                        <Badge
+                                                            className="bg-red-100 text-red-700"
+                                                            title={suspiciousReasons.join(", ")}
+                                                        >
+                                                            ⚠ Suspicious
+                                                        </Badge>
                                                     )}
                                                 </TableCell>
                                             </TableRow>
@@ -228,62 +229,42 @@ export default function CustomersPage() {
                 <Card>
                     <CardHeader>
                         <CardTitle>
-                            {selectedCustomer ? `#${selectedCustomer.id} — ${selectedCustomer.name || "Customer"}` : "Select a customer"}
+                            {selectedCustomer ? `Tickets — ${selectedCustomer.email}` : "Select a customer"}
                         </CardTitle>
                     </CardHeader>
                     <CardContent>
 
                         {!selectedCustomer ? (
-                            <p className="text-sm text-slate-500">Click a row on the left to see and edit details.</p>
+                            <p className="text-sm text-slate-500">Click "N ticket(s)" on the left to see details.</p>
                         ) : (
-                            <div className="space-y-4">
-
-                                <div>
-                                    <p className="mb-1 text-xs text-slate-500">Email</p>
-                                    <div className="flex gap-2">
-                                        <Input
-                                            value={editEmail}
-                                            onChange={(e) => setEditEmail(e.target.value)}
-                                        />
-                                        <Button
-                                            size="sm"
-                                            disabled={saving || editEmail === selectedCustomer.email}
-                                            onClick={handleSaveEmail}
-                                        >
-                                            Save
-                                        </Button>
-                                    </div>
-                                </div>
-
-                                <Button
-                                    variant="destructive"
-                                    size="sm"
-                                    disabled={saving}
-                                    onClick={handleDelete}
-                                >
-                                    Delete Customer
-                                </Button>
-
-                                <div>
-                                    <p className="mb-2 text-xs text-slate-500">Tickets</p>
-                                    {ticketsFor(selectedCustomer.id).length === 0 ? (
-                                        <p className="text-sm text-slate-500">No tickets from this customer</p>
-                                    ) : (
-                                        <div className="space-y-3">
-                                            {ticketsFor(selectedCustomer.id).map((ticket) => (
-                                                <div key={ticket.id} className="border-b border-slate-100 pb-2">
-                                                    <p className="text-sm font-medium">#{ticket.id} — {ticket.title}</p>
-                                                    <Badge className={statusColor(ticket.status)}>{ticket.status}</Badge>
-                                                    <span className="ml-2 text-sm text-slate-500">
-                                                        {ticket.rating != null ? `⭐ ${ticket.rating}/5` : "Not rated"}
-                                                    </span>
-                                                </div>
+                            <>
+                                {checkSuspicious(ticketsFor(selectedCustomer.id)).length > 0 && (
+                                    <div className="mb-3 rounded-md bg-red-50 p-2 text-sm text-red-700">
+                                        <p className="font-medium">⚠ Flagged for review:</p>
+                                        <ul className="list-disc list-inside">
+                                            {checkSuspicious(ticketsFor(selectedCustomer.id)).map((reason) => (
+                                                <li key={reason}>{reason}</li>
                                             ))}
-                                        </div>
-                                    )}
-                                </div>
+                                        </ul>
+                                    </div>
+                                )}
 
-                            </div>
+                                {ticketsFor(selectedCustomer.id).length === 0 ? (
+                                    <p className="text-sm text-slate-500">No tickets from this customer</p>
+                                ) : (
+                                    <div className="space-y-3">
+                                        {ticketsFor(selectedCustomer.id).map((ticket) => (
+                                            <div key={ticket.id} className="border-b border-slate-100 pb-2">
+                                                <p className="text-sm font-medium">#{ticket.id} — {ticket.title}</p>
+                                                <Badge className={statusColor(ticket.status)}>{ticket.status}</Badge>
+                                                <span className="ml-2 text-sm text-slate-500">
+                                                    {ticket.rating != null ? `⭐ ${ticket.rating}/5` : "Not rated"}
+                                                </span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </>
                         )}
 
                     </CardContent>

@@ -57,8 +57,8 @@ export default function AssistantPanel() {
     }
 
     return (
-        <Card className="fixed bottom-6 right-6 z-30 flex h-[520px] w-[360px] flex-col shadow-xl">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+    
+        <Card className="fixed bottom-6 right-6 z-50 flex h-[520px] w-[360px] flex-col bg-white text-slate-900 shadow-xl">            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
                 <CardTitle className="text-base">Support AI Assistant</CardTitle>
                 <Button variant="ghost" size="sm" onClick={() => setOpen(false)}>✕</Button>
             </CardHeader>
