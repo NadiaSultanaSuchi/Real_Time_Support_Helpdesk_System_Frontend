@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 
 export default function AdminLayout({
   children,
@@ -10,6 +10,7 @@ export default function AdminLayout({
   children: React.ReactNode;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
 
   const [authorized, setAuthorized] = useState(false);
 
@@ -45,6 +46,14 @@ export default function AdminLayout({
     localStorage.removeItem("refreshToken");
 
     router.replace("/login");
+  };
+
+  const isActive = (href: string) => {
+    if (href === "/admin") {
+      return pathname === "/admin";
+    }
+
+    return pathname.startsWith(href);
   };
 
   if (!authorized) {
@@ -83,7 +92,11 @@ export default function AdminLayout({
           <div className="space-y-1">
             <Link
               href="/admin"
-              className="flex items-center gap-3 rounded-xl bg-blue-600 px-3 py-3 text-sm font-medium text-white shadow-lg shadow-blue-600/10 transition hover:bg-blue-500"
+              className={`flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium transition ${
+                isActive("/admin")
+                  ? "bg-blue-600 text-white shadow-lg shadow-blue-600/10 hover:bg-blue-500"
+                  : "text-slate-300 hover:bg-slate-800 hover:text-white"
+              }`}
             >
               <span className="text-lg">▦</span>
               Dashboard
@@ -97,7 +110,11 @@ export default function AdminLayout({
           <div className="space-y-1">
             <Link
               href="/admin/tickets"
-              className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-slate-300 transition hover:bg-slate-800 hover:text-white"
+              className={`flex items-center gap-3 rounded-xl px-3 py-3 text-sm transition ${
+                isActive("/admin/tickets")
+                  ? "bg-blue-600 font-medium text-white shadow-lg shadow-blue-600/10 hover:bg-blue-500"
+                  : "text-slate-300 hover:bg-slate-800 hover:text-white"
+              }`}
             >
               <span className="text-lg">▤</span>
               Tickets
@@ -105,37 +122,57 @@ export default function AdminLayout({
 
             <Link
               href="/admin/users"
-              className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-slate-300 transition hover:bg-slate-800 hover:text-white"
+              className={`flex items-center gap-3 rounded-xl px-3 py-3 text-sm transition ${
+                isActive("/admin/users")
+                  ? "bg-blue-600 font-medium text-white shadow-lg shadow-blue-600/10 hover:bg-blue-500"
+                  : "text-slate-300 hover:bg-slate-800 hover:text-white"
+              }`}
             >
               <span className="text-lg">♙</span>
               Users
             </Link>
 
             {/* Manager Requests */}
-            {/* <Link
+            {/* 
+            <Link
               href="/admin/managers/requests"
-              className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-slate-300 transition hover:bg-slate-800 hover:text-white"
+              className={`flex items-center gap-3 rounded-xl px-3 py-3 text-sm transition ${
+                isActive("/admin/managers/requests")
+                  ? "bg-blue-600 font-medium text-white shadow-lg shadow-blue-600/10 hover:bg-blue-500"
+                  : "text-slate-300 hover:bg-slate-800 hover:text-white"
+              }`}
             >
               <span className="text-lg">🙏🥺</span>
               Manager Requests
-            </Link> */}
+            </Link>
+            */}
 
             <Link
               href="/admin/products"
-              className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-slate-300 transition hover:bg-slate-800 hover:text-white"
+              className={`flex items-center gap-3 rounded-xl px-3 py-3 text-sm transition ${
+                isActive("/admin/products")
+                  ? "bg-blue-600 font-medium text-white shadow-lg shadow-blue-600/10 hover:bg-blue-500"
+                  : "text-slate-300 hover:bg-slate-800 hover:text-white"
+              }`}
             >
               <span className="text-lg">▣</span>
               Products
             </Link>
 
             {/* Reports */}
-            {/* <Link
+            {/* 
+            <Link
               href="/admin/reports"
-              className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-slate-300 transition hover:bg-slate-800 hover:text-white"
+              className={`flex items-center gap-3 rounded-xl px-3 py-3 text-sm transition ${
+                isActive("/admin/reports")
+                  ? "bg-blue-600 font-medium text-white shadow-lg shadow-blue-600/10 hover:bg-blue-500"
+                  : "text-slate-300 hover:bg-slate-800 hover:text-white"
+              }`}
             >
               <span className="text-lg">◫</span>
               Reports
-            </Link> */}
+            </Link>
+            */}
           </div>
 
           <p className="mb-3 mt-8 px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
@@ -144,7 +181,11 @@ export default function AdminLayout({
 
           <Link
             href="/admin/profile"
-            className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-slate-300 transition hover:bg-slate-800 hover:text-white"
+            className={`flex items-center gap-3 rounded-xl px-3 py-3 text-sm transition ${
+              isActive("/admin/profile")
+                ? "bg-blue-600 font-medium text-white shadow-lg shadow-blue-600/10 hover:bg-blue-500"
+                : "text-slate-300 hover:bg-slate-800 hover:text-white"
+            }`}
           >
             <span className="text-lg">◎</span>
             My Profile
@@ -198,11 +239,12 @@ export default function AdminLayout({
 
           <div className="flex items-center gap-4">
             {/* Notification */}
-            {/* <button className="relative flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-50">
+            {/* 
+            <button className="relative flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-50">
               <span className="text-lg">♧</span>
-
               <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-blue-600" />
-            </button> */}
+            </button>
+            */}
 
             {/* Profile */}
             <div className="flex items-center gap-3 border-l border-slate-200 pl-4">
