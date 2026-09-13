@@ -7,27 +7,16 @@ import { useEffect, useState } from "react";
 
 type Ticket = {
   id: number;
-
   title: string;
-
   description: string;
-
   status: string;
-
   priority: string;
-
   isEscalated: boolean;
-
   escalatedAt?: string | null;
-
   rating?: number | null;
-
   ratingComment?: string | null;
-
   ratedAt?: string | null;
-
   createdAt?: string;
-
   updatedAt?: string;
 
   customer?: {
@@ -65,36 +54,51 @@ type Comment = {
   };
 };
 
+type Manager = {
+  id: number;
+  email: string;
+  role?: string;
+};
+
 const API_URL = "http://127.0.0.1:3000/api";
 
 export default function TicketDetailsPage() {
   const params = useParams();
-
   const router = useRouter();
 
   const [ticket, setTicket] = useState<Ticket | null>(null);
 
   const [comments, setComments] = useState<Comment[]>([]);
 
+  const [managers, setManagers] = useState<Manager[]>([]);
+
   const [loading, setLoading] = useState(true);
 
   const [commentsLoading, setCommentsLoading] = useState(true);
+
+  const [managersLoading, setManagersLoading] = useState(true);
 
   const [actionLoading, setActionLoading] = useState(false);
 
   const [commentLoading, setCommentLoading] = useState(false);
 
-  const [editingCommentId, setEditingCommentId] = useState<number | null>(
-    null
-  );
+  const [assignLoading, setAssignLoading] = useState(false);
+
+  const [editingCommentId, setEditingCommentId] =
+    useState<number | null>(null);
 
   const [commentText, setCommentText] = useState("");
 
   const [editingText, setEditingText] = useState("");
 
+  const [selectedManagerId, setSelectedManagerId] =
+    useState<string>("");
+
   const [error, setError] = useState("");
 
   const [commentError, setCommentError] = useState("");
+
+  const [assignError, setAssignError] = useState("");
 
   const ticketId = params.id;
 
@@ -138,6 +142,15 @@ export default function TicketDetailsPage() {
       );
 
       setTicket(response.data);
+
+      // Set currently assigned manager in dropdown
+      if (response.data.assignee?.id) {
+        setSelectedManagerId(
+          String(response.data.assignee.id)
+        );
+      } else {
+        setSelectedManagerId("");
+      }
     } catch (err: any) {
       console.error("Error loading ticket:", err);
 
@@ -183,11 +196,6 @@ export default function TicketDetailsPage() {
         }
       );
 
-      /*
-       * Depending on the backend response,
-       * comments may be returned directly as an array
-       * or inside a "data" property.
-       */
       const commentsData = Array.isArray(response.data)
         ? response.data
         : response.data?.data || [];
@@ -215,6 +223,68 @@ export default function TicketDetailsPage() {
   };
 
   // =========================
+  // FETCH MANAGERS
+  // =========================
+
+  const fetchManagers = async () => {
+    try {
+      setManagersLoading(true);
+      setAssignError("");
+
+      const accessToken = getAccessToken();
+
+      if (!accessToken) {
+        return;
+      }
+
+      const response = await axios.get(
+        `${API_URL}/users?role=Manager`,
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        }
+      );
+
+      /*
+       * Backend may return:
+       * 
+       * [
+       *   { id: 2, email: "manager@example.com" }
+       * ]
+       *
+       * or:
+       *
+       * { data: [...] }
+       */
+
+      const managersData = Array.isArray(response.data)
+        ? response.data
+        : response.data?.data || [];
+
+      setManagers(managersData);
+    } catch (err: any) {
+      console.error("Error loading managers:", err);
+
+      if (
+        err.response?.status === 401 ||
+        err.response?.status === 403
+      ) {
+        router.replace("/login");
+        return;
+      }
+
+      setAssignError(
+        err.response?.data?.error ||
+          err.response?.data?.message ||
+          "Failed to load managers."
+      );
+    } finally {
+      setManagersLoading(false);
+    }
+  };
+
+  // =========================
   // INITIAL LOAD
   // =========================
 
@@ -222,8 +292,68 @@ export default function TicketDetailsPage() {
     if (ticketId) {
       fetchTicket();
       fetchComments();
+      fetchManagers();
     }
   }, [ticketId]);
+
+  // =========================
+  // ASSIGN MANAGER
+  // =========================
+
+  const assignManager = async () => {
+    if (!ticket) {
+      return;
+    }
+
+    if (!selectedManagerId) {
+      setAssignError("Please select a manager.");
+      return;
+    }
+
+    try {
+      setAssignLoading(true);
+      setAssignError("");
+
+      const accessToken = getAccessToken();
+
+      if (!accessToken) {
+        return;
+      }
+
+      await axios.patch(
+        `${API_URL}/tickets/${ticket.id}/assign`,
+        {
+          assigneeId: Number(selectedManagerId),
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        }
+      );
+
+      // Reload ticket so the new assignee is displayed
+      await fetchTicket();
+    } catch (err: any) {
+      console.error("Error assigning manager:", err);
+
+      if (
+        err.response?.status === 401 ||
+        err.response?.status === 403
+      ) {
+        router.replace("/login");
+        return;
+      }
+
+      setAssignError(
+        err.response?.data?.error ||
+          err.response?.data?.message ||
+          "Failed to assign manager."
+      );
+    } finally {
+      setAssignLoading(false);
+    }
+  };
 
   // =========================
   // TICKET ACTION
@@ -414,11 +544,14 @@ export default function TicketDetailsPage() {
         return;
       }
 
-      await axios.delete(`${API_URL}/comments/${commentId}`, {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      });
+      await axios.delete(
+        `${API_URL}/comments/${commentId}`,
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        }
+      );
 
       if (editingCommentId === commentId) {
         setEditingCommentId(null);
@@ -561,7 +694,7 @@ export default function TicketDetailsPage() {
           </p>
         </div>
 
-        {/* Actions */}
+        {/* Ticket Actions */}
         <div className="flex flex-wrap gap-2">
           {ticket.status !== "Closed" && (
             <>
@@ -623,7 +756,8 @@ export default function TicketDetailsPage() {
               </p>
 
               <div className="whitespace-pre-wrap rounded-lg bg-gray-50 p-5 text-sm leading-7 text-gray-700">
-                {ticket.description || "No description provided."}
+                {ticket.description ||
+                  "No description provided."}
               </div>
             </div>
           </div>
@@ -678,7 +812,8 @@ export default function TicketDetailsPage() {
                 {ticket.product ? (
                   <div className="mt-1">
                     <p className="font-medium text-gray-900">
-                      {ticket.product.name || "Unnamed Product"}
+                      {ticket.product.name ||
+                        "Unnamed Product"}
                     </p>
 
                     {ticket.product.id && (
@@ -711,19 +846,81 @@ export default function TicketDetailsPage() {
                 )}
               </div>
 
-              {/* Assignee */}
+              {/* Assigned Manager */}
               <div>
                 <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
                   Assigned To
                 </p>
 
-                <p className="mt-1 font-medium text-gray-900">
-                  {ticket.assignee?.email || "Unassigned"}
-                </p>
+                {managersLoading ? (
+                  <p className="mt-2 text-sm text-gray-500">
+                    Loading managers...
+                  </p>
+                ) : (
+                  <>
+                    <select
+                      value={selectedManagerId}
+                      onChange={(e) => {
+                        setSelectedManagerId(e.target.value);
+                        setAssignError("");
+                      }}
+                      disabled={
+                        assignLoading ||
+                        managers.length === 0
+                      }
+                      className="mt-2 w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-gray-50"
+                    >
+                      <option value="">
+                        Select a manager
+                      </option>
 
-                {ticket.assignee?.id && (
-                  <p className="text-xs text-gray-500">
-                    Manager ID: {ticket.assignee.id}
+                      {managers.map((manager) => (
+                        <option
+                          key={manager.id}
+                          value={manager.id}
+                        >
+                          {manager.email}
+                        </option>
+                      ))}
+                    </select>
+
+                    <button
+                      onClick={assignManager}
+                      disabled={
+                        assignLoading ||
+                        !selectedManagerId ||
+                        managers.length === 0
+                      }
+                      className="mt-2 w-full rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {assignLoading
+                        ? "Assigning..."
+                        : ticket.assignee
+                        ? "Reassign Manager"
+                        : "Assign Manager"}
+                    </button>
+
+                    {ticket.assignee && (
+                      <p className="mt-2 text-xs text-gray-500">
+                        Currently assigned to:{" "}
+                        <span className="font-medium text-gray-700">
+                          {ticket.assignee.email ||
+                            "Unknown"}
+                        </span>
+                      </p>
+                    )}
+
+                    {managers.length === 0 && (
+                      <p className="mt-2 text-xs text-gray-500">
+                        No managers available.
+                      </p>
+                    )}
+                  </>
+                )}
+
+                {assignError && (
+                  <p className="mt-2 text-sm text-red-600">
+                    {assignError}
                   </p>
                 )}
               </div>
@@ -841,7 +1038,8 @@ export default function TicketDetailsPage() {
               </p>
 
               <p className="mt-1 text-sm text-gray-900">
-                {ticket.ratingComment || "No comment"}
+                {ticket.ratingComment ||
+                  "No comment"}
               </p>
             </div>
           </div>
@@ -865,7 +1063,9 @@ export default function TicketDetailsPage() {
 
           <span className="rounded-full bg-gray-100 px-3 py-1 text-sm font-medium text-gray-700">
             {comments.length}{" "}
-            {comments.length === 1 ? "Comment" : "Comments"}
+            {comments.length === 1
+              ? "Comment"
+              : "Comments"}
           </span>
         </div>
 
@@ -901,10 +1101,15 @@ export default function TicketDetailsPage() {
           <div className="mt-3 flex justify-end">
             <button
               onClick={addComment}
-              disabled={commentLoading || !commentText.trim()}
+              disabled={
+                commentLoading ||
+                !commentText.trim()
+              }
               className="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {commentLoading ? "Sending..." : "Add Comment"}
+              {commentLoading
+                ? "Sending..."
+                : "Add Comment"}
             </button>
           </div>
         </div>
@@ -942,18 +1147,23 @@ export default function TicketDetailsPage() {
 
                     <p className="mt-0.5 text-xs text-gray-500">
                       {formatDate(comment.createdAt)}
+
                       {comment.updatedAt &&
-                        comment.updatedAt !== comment.createdAt &&
+                        comment.updatedAt !==
+                          comment.createdAt &&
                         " • Edited"}
                     </p>
                   </div>
 
                   {/* Admin Actions */}
-                  {editingCommentId !== comment.id && (
+                  {editingCommentId !==
+                    comment.id && (
                     <div className="flex gap-2">
                       <button
                         onClick={() =>
-                          startEditingComment(comment)
+                          startEditingComment(
+                            comment
+                          )
                         }
                         disabled={commentLoading}
                         className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
@@ -963,7 +1173,9 @@ export default function TicketDetailsPage() {
 
                       <button
                         onClick={() =>
-                          deleteComment(comment.id)
+                          deleteComment(
+                            comment.id
+                          )
                         }
                         disabled={commentLoading}
                         className="rounded-md border border-red-200 bg-white px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
@@ -975,12 +1187,15 @@ export default function TicketDetailsPage() {
                 </div>
 
                 {/* Comment Content / Edit */}
-                {editingCommentId === comment.id ? (
+                {editingCommentId ===
+                comment.id ? (
                   <div className="mt-4">
                     <textarea
                       value={editingText}
                       onChange={(e) => {
-                        setEditingText(e.target.value);
+                        setEditingText(
+                          e.target.value
+                        );
                         setCommentError("");
                       }}
                       rows={4}
@@ -990,7 +1205,9 @@ export default function TicketDetailsPage() {
 
                     <div className="mt-3 flex justify-end gap-2">
                       <button
-                        onClick={cancelEditingComment}
+                        onClick={
+                          cancelEditingComment
+                        }
                         disabled={commentLoading}
                         className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
                       >
@@ -999,7 +1216,9 @@ export default function TicketDetailsPage() {
 
                       <button
                         onClick={() =>
-                          updateComment(comment.id)
+                          updateComment(
+                            comment.id
+                          )
                         }
                         disabled={
                           commentLoading ||
