@@ -9,8 +9,9 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import AssistantPanel from "@/components/AssistantPanel";
 
-export default function ManagerLayout({ children }) {
+export default function ManagerLayout({ children }: { children: React.ReactNode }) {
 
     const router = useRouter();
     const pathname = usePathname();
@@ -26,17 +27,14 @@ export default function ManagerLayout({ children }) {
         const token = localStorage.getItem("accessToken");
 
         if (!token) {
-            console.log("no token, redirecting");
             router.push("/login");
             return;
         }
 
         try {
-            const decoded = jwtDecode(token);
-            console.log(decoded);
+            const decoded = jwtDecode<{ sub: number; email: string; role: string }>(token);
 
             if (decoded.role != "Manager") {
-                console.log("not a manager, redirecting");
                 router.push("/login");
                 return;
             }
@@ -45,7 +43,6 @@ export default function ManagerLayout({ children }) {
             setAuthorized(true);
         }
         catch (error) {
-            console.log(error);
             router.push("/login");
         }
 
@@ -78,7 +75,6 @@ export default function ManagerLayout({ children }) {
 
                 <nav className="flex-1 px-4 py-6 space-y-1">
                     {navItems.map((item) => (
-                    
                         <Link
                             key={item.href}
                             href={item.href}
@@ -103,7 +99,6 @@ export default function ManagerLayout({ children }) {
                         onClick={() => {
                             localStorage.removeItem("accessToken");
                             localStorage.removeItem("refreshToken");
-                            console.log("logging out");
                             router.push("/login");
                         }}
                     >
@@ -137,6 +132,8 @@ export default function ManagerLayout({ children }) {
                 </main>
 
             </div>
+
+            <AssistantPanel />
 
         </div>
     );

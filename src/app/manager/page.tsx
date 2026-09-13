@@ -14,21 +14,21 @@ import {
 } from "@/components/ui/table";
 import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
-function statusColor(status) {
+function statusColor(status: string) {
     if (status === "Resolved") return "bg-green-100 text-green-700";
     if (status === "InProgress") return "bg-amber-100 text-amber-700";
     if (status === "Closed") return "bg-slate-200 text-slate-600";
-    return "bg-blue-100 text-blue-700"; // Open / New
+    return "bg-blue-100 text-blue-700";
 }
 
-function priorityColor(priority) {
+function priorityColor(priority: string) {
     if (priority === "Urgent" || priority === "Critical") return "bg-red-100 text-red-700";
     if (priority === "High") return "bg-orange-100 text-orange-700";
     if (priority === "Medium") return "bg-amber-100 text-amber-700";
-    return "bg-slate-100 text-slate-600"; // Low
+    return "bg-slate-100 text-slate-600";
 }
 
-const donutColors = {
+const donutColors: Record<string, string> = {
     Open: "#3b82f6",
     New: "#3b82f6",
     InProgress: "#f59e0b",
@@ -51,14 +51,14 @@ export default function ManagerDashboard() {
         inProgressTickets: { value: 0, changePct: 0 },
     })
 
-    const [ticketVolume, setTicketVolume] = useState([]);
-    const [ticketStatusBreakdown, setTicketStatusBreakdown] = useState([]);
-    const [recentTickets, setRecentTickets] = useState([]);
+    const [ticketVolume, setTicketVolume] = useState<any[]>([]);
+    const [ticketStatusBreakdown, setTicketStatusBreakdown] = useState<any[]>([]);
+    const [recentTickets, setRecentTickets] = useState<any[]>([]);
     const [teamMembersCount, setTeamMembersCount] = useState(0);
     const [avgResponseTimeMinutes, setAvgResponseTimeMinutes] = useState(0);
 
     const [loading, setLoading] = useState(true);
-    const [errorMessage, setErrorMessage] = useState(null);
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
     useEffect(() => {
 
@@ -81,7 +81,7 @@ export default function ManagerDashboard() {
 
                 setLoading(false);
             }
-            catch (error) {
+            catch (error: any) {
                 if (error.response) {
                     setErrorMessage(error.response.data?.error || "Could not load dashboard");
                 } else {

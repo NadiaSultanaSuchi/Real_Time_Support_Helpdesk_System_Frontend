@@ -20,34 +20,33 @@ import {
     SheetTitle,
 } from "@/components/ui/sheet";
 
-function statusColor(status) {
+function statusColor(status: string) {
     if (status === "Resolved") return "bg-green-100 text-green-700";
     if (status === "InProgress") return "bg-amber-100 text-amber-700";
     if (status === "Closed") return "bg-slate-200 text-slate-600";
-    return "bg-blue-100 text-blue-700"; // Open
+    return "bg-blue-100 text-blue-700";
 }
 
-function priorityColor(priority) {
+function priorityColor(priority: string) {
     if (priority === "Urgent") return "bg-red-100 text-red-700";
     if (priority === "High") return "bg-orange-100 text-orange-700";
     if (priority === "Medium") return "bg-amber-100 text-amber-700";
-    return "bg-slate-100 text-slate-600"; // Low
+    return "bg-slate-100 text-slate-600";
 }
 
 export default function AssignedTicketsPage() {
 
     const [totalAssigned, setTotalAssigned] = useState(0);
-    const [byStatus, setByStatus] = useState({});
-    const [tickets, setTickets] = useState([]);
+    const [byStatus, setByStatus] = useState<any>({});
+    const [tickets, setTickets] = useState<any[]>([]);
 
     const [loading, setLoading] = useState(true);
-    const [errorMessage, setErrorMessage] = useState(null);
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-    const [actingOnId, setActingOnId] = useState(null);
+    const [actingOnId, setActingOnId] = useState<number | null>(null);
 
-    
     const [sheetOpen, setSheetOpen] = useState(false);
-    const [selectedTicket, setSelectedTicket] = useState(null);
+    const [selectedTicket, setSelectedTicket] = useState<any>(null);
     const [detailLoading, setDetailLoading] = useState(false);
 
     const token = typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
@@ -63,7 +62,7 @@ export default function AssignedTicketsPage() {
             setTickets(response.data.tickets);
             setErrorMessage(null);
         }
-        catch (error) {
+        catch (error: any) {
             if (error.response) {
                 setErrorMessage(error.response.data?.error || "Could not load assigned tickets");
             } else {
@@ -79,7 +78,7 @@ export default function AssignedTicketsPage() {
         loadAssignedTickets();
     }, [])
 
-    const handleRowClick = async (ticketId) => {
+    const handleRowClick = async (ticketId: number) => {
         setSheetOpen(true);
         setDetailLoading(true);
         setSelectedTicket(null);
@@ -90,7 +89,7 @@ export default function AssignedTicketsPage() {
             });
             setSelectedTicket(response.data);
         }
-        catch (error) {
+        catch (error: any) {
             alert(error.response?.data?.error || "Could not load ticket details");
             setSheetOpen(false);
         }
@@ -99,7 +98,7 @@ export default function AssignedTicketsPage() {
         }
     }
 
-    const handleEscalate = async (ticketId) => {
+    const handleEscalate = async (ticketId: number) => {
         setActingOnId(ticketId);
         try {
             await axios.patch(`http://localhost:3000/api/tickets/${ticketId}/escalate`, {}, {
@@ -107,7 +106,7 @@ export default function AssignedTicketsPage() {
             });
             await loadAssignedTickets();
         }
-        catch (error) {
+        catch (error: any) {
             alert(error.response?.data?.error || "Could not escalate ticket");
         }
         finally {
@@ -115,7 +114,7 @@ export default function AssignedTicketsPage() {
         }
     }
 
-    const handleClose = async (ticketId) => {
+    const handleClose = async (ticketId: number) => {
         setActingOnId(ticketId);
         try {
             await axios.patch(`http://localhost:3000/api/tickets/${ticketId}/close`, {}, {
@@ -123,7 +122,7 @@ export default function AssignedTicketsPage() {
             });
             await loadAssignedTickets();
         }
-        catch (error) {
+        catch (error: any) {
             alert(error.response?.data?.error || "Could not close ticket");
         }
         finally {

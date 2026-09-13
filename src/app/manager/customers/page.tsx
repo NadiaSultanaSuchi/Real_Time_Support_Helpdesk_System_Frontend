@@ -16,30 +16,30 @@ import {
 } from "@/components/ui/table";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
-function statusColor(status) {
+function statusColor(status: string) {
     if (status === "Resolved") return "bg-green-100 text-green-700";
     if (status === "InProgress") return "bg-amber-100 text-amber-700";
     if (status === "Closed") return "bg-slate-200 text-slate-600";
     return "bg-blue-100 text-blue-700";
 }
 
-function averageRating(tickets) {
-    const rated = tickets.filter((t) => t.rating != null);
+function averageRating(tickets: any[]) {
+    const rated = tickets.filter((t: any) => t.rating != null);
     if (rated.length === 0) return null;
-    const sum = rated.reduce((total, t) => total + t.rating, 0);
+    const sum = rated.reduce((total: number, t: any) => total + t.rating, 0);
     return Number((sum / rated.length).toFixed(1));
 }
 
 export default function CustomersPage() {
 
-    const [customers, setCustomers] = useState([]);
-    const [tickets, setTickets] = useState([]);
-    const [selectedId, setSelectedId] = useState(null);
+    const [customers, setCustomers] = useState<any[]>([]);
+    const [tickets, setTickets] = useState<any[]>([]);
+    const [selectedId, setSelectedId] = useState<number | null>(null);
     const [editEmail, setEditEmail] = useState("");
     const [saving, setSaving] = useState(false);
 
     const [loading, setLoading] = useState(true);
-    const [errorMessage, setErrorMessage] = useState(null);
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
     const token = typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
 
@@ -58,7 +58,7 @@ export default function CustomersPage() {
             setTickets(ticketsRes.data.data);
             setErrorMessage(null);
         }
-        catch (error) {
+        catch (error: any) {
             if (error.response) {
                 setErrorMessage(error.response.data?.error || "Could not load customers");
             } else {
@@ -82,7 +82,7 @@ export default function CustomersPage() {
         }
     }, [selectedId])
 
-    const ticketsFor = (customerId) => {
+    const ticketsFor = (customerId: number) => {
         return tickets.filter((t) => t.customer?.id === customerId);
     }
 
@@ -96,7 +96,7 @@ export default function CustomersPage() {
             });
             await loadData();
         }
-        catch (error) {
+        catch (error: any) {
             alert(error.response?.data?.error || "Could not update customer");
         }
         finally {
@@ -117,7 +117,7 @@ export default function CustomersPage() {
             setSelectedId(null);
             await loadData();
         }
-        catch (error) {
+        catch (error: any) {
             alert(error.response?.data?.error || "Could not delete customer");
         }
         finally {
