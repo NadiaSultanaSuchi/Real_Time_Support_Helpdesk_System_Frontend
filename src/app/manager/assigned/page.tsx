@@ -13,6 +13,12 @@ import {
     TableHead,
     TableCell,
 } from "@/components/ui/table";
+import {
+    Sheet,
+    SheetContent,
+    SheetHeader,
+    SheetTitle,
+} from "@/components/ui/sheet";
 
 function statusColor(status) {
     if (status === "Resolved") return "bg-green-100 text-green-700";
@@ -38,6 +44,11 @@ export default function AssignedTicketsPage() {
     const [errorMessage, setErrorMessage] = useState(null);
 
     const [actingOnId, setActingOnId] = useState(null);
+
+    
+    const [sheetOpen, setSheetOpen] = useState(false);
+    const [selectedTicket, setSelectedTicket] = useState(null);
+    const [detailLoading, setDetailLoading] = useState(false);
 
     const token = typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
 
@@ -68,13 +79,33 @@ export default function AssignedTicketsPage() {
         loadAssignedTickets();
     }, [])
 
+    const handleRowClick = async (ticketId) => {
+        setSheetOpen(true);
+        setDetailLoading(true);
+        setSelectedTicket(null);
+
+        try {
+            const response = await axios.get(`http://localhost:3000/api/tickets/${ticketId}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setSelectedTicket(response.data);
+        }
+        catch (error) {
+            alert(error.response?.data?.error || "Could not load ticket details");
+            setSheetOpen(false);
+        }
+        finally {
+            setDetailLoading(false);
+        }
+    }
+
     const handleEscalate = async (ticketId) => {
         setActingOnId(ticketId);
         try {
             await axios.patch(`http://localhost:3000/api/tickets/${ticketId}/escalate`, {}, {
                 headers: { Authorization: `Bearer ${token}` }
             });
-            await loadAssignedTickets(); 
+            await loadAssignedTickets();
         }
         catch (error) {
             alert(error.response?.data?.error || "Could not escalate ticket");
@@ -169,7 +200,11 @@ export default function AssignedTicketsPage() {
                             </TableHeader>
                             <TableBody>
                                 {tickets.map((ticket) => (
-                                    <TableRow key={ticket.id}>
+                                    <TableRow
+                                        key={ticket.id}
+                                        className="cursor-pointer hover:bg-slate-50"
+                                        onClick={() => handleRowClick(ticket.id)}
+                                    >
                                         <TableCell>#{ticket.id}</TableCell>
                                         <TableCell>{ticket.title}</TableCell>
                                         <TableCell>{ticket.customer?.email ?? "—"}</TableCell>
@@ -179,7 +214,7 @@ export default function AssignedTicketsPage() {
                                         <TableCell>
                                             <Badge className={priorityColor(ticket.priority)}>{ticket.priority}</Badge>
                                         </TableCell>
-                                        <TableCell>
+                                        <TableCell onClick={(e) => e.stopPropagation()}>
                                             <div className="flex gap-2">
                                                 <Button
                                                     variant="outline"
@@ -207,6 +242,58 @@ export default function AssignedTicketsPage() {
 
                 </CardContent>
             </Card>
+
+            <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+                <SheetContent>
+                    <SheetHeader>
+                        <SheetTitle>Ticket Details</SheetTitle>
+                    </SheetHeader>
+
+                    <div className="px-4">
+                        {detailLoading ? (
+                            <p>Loading...</p>
+                        ) : !selectedTicket ? (
+                            <p className="text-sm text-slate-500">No ticket selected</p>
+                        ) : (
+                            <div className="space-y-4">
+
+                                <div>
+                                    <p className="text-sm text-slate-500">Title</p>
+                                    <p className="font-medium">{selectedTicket.title}</p>
+                                </div>
+
+                                <div>
+                                    <p className="text-sm text-slate-500">Description</p>
+                                    <p className="text-sm">{selectedTicket.description}</p>
+                                </div>
+
+                                <div className="flex gap-2">
+                                    <Badge className={statusColor(selectedTicket.status)}>{selectedTicket.status}</Badge>
+                                    <Badge className={priorityColor(selectedTicket.priority)}>{selectedTicket.priority}</Badge>
+                                </div>
+
+                                <div>
+                                    <p className="text-sm text-slate-500">Customer</p>
+                                    <p className="text-sm">{selectedTicket.customer?.name || selectedTicket.customer?.email}</p>
+                                </div>
+
+                                <div>
+                                    <p className="text-sm text-slate-500">Created</p>
+                                    <p className="text-sm">{new Date(selectedTicket.createdAt).toLocaleString()}</p>
+                                </div>
+
+                                {selectedTicket.rating != null && (
+                                    <div>
+                                        <p className="text-sm text-slate-500">Rating</p>
+                                        <p className="text-sm">⭐ {selectedTicket.rating}/5</p>
+                                    </div>
+                                )}
+
+                            </div>
+                        )}
+                    </div>
+                </SheetContent>
+            </Sheet>
 
         </div>
     );

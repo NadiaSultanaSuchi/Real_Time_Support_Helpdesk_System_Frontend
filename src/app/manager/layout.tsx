@@ -61,6 +61,7 @@ export default function ManagerLayout({ children }) {
         { href: "/manager/tickets", label: "Ticket Details" },
         { href: "/manager/team", label: "Team Management" },
         { href: "/manager/reports", label: "Reports" },
+        { href: "/manager/customers", label: "Customers" }
     ];
 
     return (
@@ -77,10 +78,7 @@ export default function ManagerLayout({ children }) {
 
                 <nav className="flex-1 px-4 py-6 space-y-1">
                     {navItems.map((item) => (
-                        // Nadia — asChild + Slot wasn't working with this
-                        // project's Button component, so instead of wrapping
-                        // Link in Button, we style the Link directly to look
-                        // like one (same visual result, no Slot dependency).
+                    
                         <Link
                             key={item.href}
                             href={item.href}

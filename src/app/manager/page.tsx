@@ -3,7 +3,38 @@
 import axios from 'axios';
 import { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { Badge } from "@/components/ui/badge";
+import {
+    Table,
+    TableHeader,
+    TableBody,
+    TableRow,
+    TableHead,
+    TableCell,
+} from "@/components/ui/table";
+import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+
+function statusColor(status) {
+    if (status === "Resolved") return "bg-green-100 text-green-700";
+    if (status === "InProgress") return "bg-amber-100 text-amber-700";
+    if (status === "Closed") return "bg-slate-200 text-slate-600";
+    return "bg-blue-100 text-blue-700"; // Open / New
+}
+
+function priorityColor(priority) {
+    if (priority === "Urgent" || priority === "Critical") return "bg-red-100 text-red-700";
+    if (priority === "High") return "bg-orange-100 text-orange-700";
+    if (priority === "Medium") return "bg-amber-100 text-amber-700";
+    return "bg-slate-100 text-slate-600"; // Low
+}
+
+const donutColors = {
+    Open: "#3b82f6",
+    New: "#3b82f6",
+    InProgress: "#f59e0b",
+    Resolved: "#22c55e",
+    Closed: "#94a3b8",
+};
 
 export default function ManagerDashboard() {
 
@@ -26,11 +57,6 @@ export default function ManagerDashboard() {
     const [teamMembersCount, setTeamMembersCount] = useState(0);
     const [avgResponseTimeMinutes, setAvgResponseTimeMinutes] = useState(0);
 
-    const [customerSatisfaction, setCustomerSatisfaction] = useState({
-        overallAvgRating: 0,
-        trend: [],
-    })
-
     const [loading, setLoading] = useState(true);
     const [errorMessage, setErrorMessage] = useState(null);
 
@@ -52,7 +78,6 @@ export default function ManagerDashboard() {
                 setRecentTickets(response.data.recentTickets);
                 setTeamMembersCount(response.data.teamMembersCount);
                 setAvgResponseTimeMinutes(response.data.avgResponseTimeMinutes);
-                setCustomerSatisfaction(response.data.customerSatisfaction);
 
                 setLoading(false);
             }
@@ -130,39 +155,104 @@ export default function ManagerDashboard() {
 
             <br />
 
-            <div className="grid grid-cols-2 gap-6">
+            <Card>
+                <CardHeader>
+                    <CardTitle>Ticket Volume (This Week)</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <ResponsiveContainer width="100%" height={220}>
+                        <BarChart data={ticketVolume}>
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis dataKey="day" />
+                            <YAxis />
+                            <Tooltip />
+                            <Bar dataKey="count" fill="#60a5fa" />
+                        </BarChart>
+                    </ResponsiveContainer>
+                </CardContent>
+            </Card>
 
-                <Card>
+            <br />
+
+            <div className="grid grid-cols-3 gap-6">
+
+                <Card className="col-span-2">
                     <CardHeader>
-                        <CardTitle>Ticket Volume (This Week)</CardTitle>
+                        <CardTitle>Recent Tickets</CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <ResponsiveContainer width="100%" height={220}>
-                            <BarChart data={ticketVolume}>
-                                <CartesianGrid strokeDasharray="3 3" />
-                                <XAxis dataKey="day" />
-                                <YAxis />
-                                <Tooltip />
-                                <Bar dataKey="count" fill="#60a5fa" />
-                            </BarChart>
-                        </ResponsiveContainer>
+                        {recentTickets.length === 0 ? (
+                            <p className="text-sm text-slate-500">No tickets yet</p>
+                        ) : (
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>ID</TableHead>
+                                        <TableHead>Subject</TableHead>
+                                        <TableHead>User</TableHead>
+                                        <TableHead>Status</TableHead>
+                                        <TableHead>Priority</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {recentTickets.map((ticket) => (
+                                        <TableRow key={ticket.id}>
+                                            <TableCell>#TKT-{ticket.id}</TableCell>
+                                            <TableCell>{ticket.title}</TableCell>
+                                            <TableCell>{ticket.customerName}</TableCell>
+                                            <TableCell>
+                                                <Badge className={statusColor(ticket.status)}>{ticket.status}</Badge>
+                                            </TableCell>
+                                            <TableCell>
+                                                <Badge className={priorityColor(ticket.priority)}>{ticket.priority}</Badge>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        )}
                     </CardContent>
                 </Card>
 
                 <Card>
                     <CardHeader>
-                        <CardTitle>Customer Satisfaction (Last 6 Months)</CardTitle>
+                        <CardTitle>Ticket Status</CardTitle>
                     </CardHeader>
-                    <CardContent>
-                        <ResponsiveContainer width="100%" height={220}>
-                            <LineChart data={customerSatisfaction.trend}>
-                                <CartesianGrid strokeDasharray="3 3" />
-                                <XAxis dataKey="month" />
-                                <YAxis domain={[0, 5]} />
+                    <CardContent className="flex flex-col items-center">
+
+                        <ResponsiveContainer width={200} height={200}>
+                            <PieChart>
+                                <Pie
+                                    data={ticketStatusBreakdown}
+                                    dataKey="count"
+                                    nameKey="status"
+                                    innerRadius={60}
+                                    outerRadius={90}
+                                    paddingAngle={2}
+                                >
+                                    {ticketStatusBreakdown.map((entry) => (
+                                        <Cell key={entry.status} fill={donutColors[entry.status] ?? "#cbd5e1"} />
+                                    ))}
+                                </Pie>
                                 <Tooltip />
-                                <Line type="monotone" dataKey="avgRating" stroke="#3b82f6" />
-                            </LineChart>
+                            </PieChart>
                         </ResponsiveContainer>
+
+                        <div className="mt-4 w-full space-y-2">
+                            {ticketStatusBreakdown.map((entry) => (
+                                <div key={entry.status} className="flex items-center justify-between text-sm">
+                                    <span className="flex items-center gap-2 text-slate-600">
+                                        <span
+                                            className="h-2.5 w-2.5 rounded-full"
+                                            style={{ backgroundColor: donutColors[entry.status] ?? "#cbd5e1" }}
+                                        />
+                                        {entry.status}
+                                    </span>
+                                    <span className="font-medium">{entry.count}</span>
+                                </div>
+                            ))}
+                        </div>
+
                     </CardContent>
                 </Card>
 
