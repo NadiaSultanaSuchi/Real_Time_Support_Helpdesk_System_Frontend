@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
     Table,
     TableHeader,
@@ -19,7 +20,7 @@ function statusColor(status) {
     if (status === "Resolved") return "bg-green-100 text-green-700";
     if (status === "InProgress") return "bg-amber-100 text-amber-700";
     if (status === "Closed") return "bg-slate-200 text-slate-600";
-    return "bg-blue-100 text-blue-700"; // Open
+    return "bg-blue-100 text-blue-700";
 }
 
 function averageRating(tickets) {
@@ -34,46 +35,94 @@ export default function CustomersPage() {
     const [customers, setCustomers] = useState([]);
     const [tickets, setTickets] = useState([]);
     const [selectedId, setSelectedId] = useState(null);
+    const [editEmail, setEditEmail] = useState("");
+    const [saving, setSaving] = useState(false);
 
     const [loading, setLoading] = useState(true);
     const [errorMessage, setErrorMessage] = useState(null);
 
     const token = typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
 
-    useEffect(() => {
+    const loadData = async () => {
+        try {
+            const [customersRes, ticketsRes] = await Promise.all([
+                axios.get("http://localhost:3000/api/users/customers", {
+                    headers: { Authorization: `Bearer ${token}` }
+                }),
+                axios.get("http://localhost:3000/api/tickets?limit=100", {
+                    headers: { Authorization: `Bearer ${token}` }
+                }),
+            ]);
 
-        const loadData = async () => {
-            try {
-                const [customersRes, ticketsRes] = await Promise.all([
-                    axios.get("http://localhost:3000/api/users/customers", {
-                        headers: { Authorization: `Bearer ${token}` }
-                    }),
-                    axios.get("http://localhost:3000/api/tickets?limit=100", {
-                        headers: { Authorization: `Bearer ${token}` }
-                    }),
-                ]);
-
-                setCustomers(customersRes.data);
-                setTickets(ticketsRes.data.data);
-            }
-            catch (error) {
-                if (error.response) {
-                    setErrorMessage(error.response.data?.error || "Could not load customers");
-                } else {
-                    setErrorMessage("Could not reach the server. Is the backend running?");
-                }
-            }
-            finally {
-                setLoading(false);
+            setCustomers(customersRes.data);
+            setTickets(ticketsRes.data.data);
+            setErrorMessage(null);
+        }
+        catch (error) {
+            if (error.response) {
+                setErrorMessage(error.response.data?.error || "Could not load customers");
+            } else {
+                setErrorMessage("Could not reach the server. Is the backend running?");
             }
         }
+        finally {
+            setLoading(false);
+        }
+    }
 
+    useEffect(() => {
         loadData();
-
     }, [])
+
+    const selectedCustomer = customers.find((c) => c.id === selectedId);
+
+    useEffect(() => {
+        if (selectedCustomer) {
+            setEditEmail(selectedCustomer.email);
+        }
+    }, [selectedId])
 
     const ticketsFor = (customerId) => {
         return tickets.filter((t) => t.customer?.id === customerId);
+    }
+
+    const handleSaveEmail = async () => {
+        if (!selectedCustomer || editEmail === selectedCustomer.email) return;
+
+        setSaving(true);
+        try {
+            await axios.patch(`http://localhost:3000/api/users/customers/${selectedCustomer.id}`, { email: editEmail }, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            await loadData();
+        }
+        catch (error) {
+            alert(error.response?.data?.error || "Could not update customer");
+        }
+        finally {
+            setSaving(false);
+        }
+    }
+
+    const handleDelete = async () => {
+        if (!selectedCustomer) return;
+        const confirmed = confirm(`Delete ${selectedCustomer.email}? This cannot be undone.`);
+        if (!confirmed) return;
+
+        setSaving(true);
+        try {
+            await axios.delete(`http://localhost:3000/api/users/customers/${selectedCustomer.id}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setSelectedId(null);
+            await loadData();
+        }
+        catch (error) {
+            alert(error.response?.data?.error || "Could not delete customer");
+        }
+        finally {
+            setSaving(false);
+        }
     }
 
     if (loading) {
@@ -84,11 +133,6 @@ export default function CustomersPage() {
         return <p className="text-red-600">{errorMessage}</p>
     }
 
-    const selectedCustomer = customers.find((c) => c.id === selectedId);
-
-    // shudhu jader rating ache tader diyei chart banacchi,
-    // "Not rated" customer-ke 0 hisebe dekhale mone hobe se kharap
-    // rating diyeche, ja bhul bojhabe — tai bad dilam.
     const satisfactionData = customers
         .map((c) => ({
             name: c.name || c.email,
@@ -151,19 +195,19 @@ export default function CustomersPage() {
                                         const avg = averageRating(custTickets);
 
                                         return (
-                                            <TableRow key={customer.id}>
+                                            <TableRow
+                                                key={customer.id}
+                                                onClick={() => setSelectedId(customer.id)}
+                                                className={
+                                                    selectedId === customer.id
+                                                        ? "cursor-pointer bg-blue-50"
+                                                        : "cursor-pointer"
+                                                }
+                                            >
                                                 <TableCell>#{customer.id}</TableCell>
                                                 <TableCell>{customer.name || "—"}</TableCell>
                                                 <TableCell>{customer.email}</TableCell>
-                                                <TableCell>
-                                                    <Button
-                                                        variant="link"
-                                                        className="p-0 h-auto"
-                                                        onClick={() => setSelectedId(customer.id)}
-                                                    >
-                                                        {custTickets.length} ticket(s)
-                                                    </Button>
-                                                </TableCell>
+                                                <TableCell>{custTickets.length} ticket(s)</TableCell>
                                                 <TableCell>
                                                     {avg === null ? (
                                                         <span className="text-slate-400">Not rated</span>
@@ -184,26 +228,61 @@ export default function CustomersPage() {
                 <Card>
                     <CardHeader>
                         <CardTitle>
-                            {selectedCustomer ? `Tickets — ${selectedCustomer.email}` : "Select a customer"}
+                            {selectedCustomer ? `#${selectedCustomer.id} — ${selectedCustomer.name || "Customer"}` : "Select a customer"}
                         </CardTitle>
                     </CardHeader>
                     <CardContent>
 
                         {!selectedCustomer ? (
-                            <p className="text-sm text-slate-500">Click "N ticket(s)" on the left to see details.</p>
-                        ) : ticketsFor(selectedCustomer.id).length === 0 ? (
-                            <p className="text-sm text-slate-500">No tickets from this customer</p>
+                            <p className="text-sm text-slate-500">Click a row on the left to see and edit details.</p>
                         ) : (
-                            <div className="space-y-3">
-                                {ticketsFor(selectedCustomer.id).map((ticket) => (
-                                    <div key={ticket.id} className="border-b border-slate-100 pb-2">
-                                        <p className="text-sm font-medium">#{ticket.id} — {ticket.title}</p>
-                                        <Badge className={statusColor(ticket.status)}>{ticket.status}</Badge>
-                                        <span className="ml-2 text-sm text-slate-500">
-                                            {ticket.rating != null ? `⭐ ${ticket.rating}/5` : "Not rated"}
-                                        </span>
+                            <div className="space-y-4">
+
+                                <div>
+                                    <p className="mb-1 text-xs text-slate-500">Email</p>
+                                    <div className="flex gap-2">
+                                        <Input
+                                            value={editEmail}
+                                            onChange={(e) => setEditEmail(e.target.value)}
+                                        />
+                                        <Button
+                                            size="sm"
+                                            disabled={saving || editEmail === selectedCustomer.email}
+                                            onClick={handleSaveEmail}
+                                        >
+                                            Save
+                                        </Button>
                                     </div>
-                                ))}
+                                </div>
+
+                                <Button
+                                    variant="destructive"
+                                    size="sm"
+                                    disabled={saving}
+                                    onClick={handleDelete}
+                                >
+                                    Delete Customer
+                                </Button>
+
+                                <div>
+                                    <p className="mb-2 text-xs text-slate-500">Tickets</p>
+                                    {ticketsFor(selectedCustomer.id).length === 0 ? (
+                                        <p className="text-sm text-slate-500">No tickets from this customer</p>
+                                    ) : (
+                                        <div className="space-y-3">
+                                            {ticketsFor(selectedCustomer.id).map((ticket) => (
+                                                <div key={ticket.id} className="border-b border-slate-100 pb-2">
+                                                    <p className="text-sm font-medium">#{ticket.id} — {ticket.title}</p>
+                                                    <Badge className={statusColor(ticket.status)}>{ticket.status}</Badge>
+                                                    <span className="ml-2 text-sm text-slate-500">
+                                                        {ticket.rating != null ? `⭐ ${ticket.rating}/5` : "Not rated"}
+                                                    </span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+
                             </div>
                         )}
 
