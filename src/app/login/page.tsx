@@ -1,356 +1,181 @@
 "use client";
 
 import axios from "axios";
-import Link from "next/link";
+import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
-import { type FormEvent, useState } from "react";
-import { z } from "zod";
-
-const loginSchema = z.object({
-    email: z
-        .string()
-        .trim()
-        .min(1, "Email is required.")
-        .email("Please enter a valid email address."),
-
-    password: z
-        .string()
-        .min(1, "Password is required.")
-        .min(6, "Password must contain at least 6 characters."),
-});
-
-interface FormErrors {
-    email?: string;
-    password?: string;
-}
-
-function getRoleFromToken(token: string): string | undefined {
-    try {
-        const encodedPayload = token.split(".")[1];
-
-        if (!encodedPayload) {
-            return undefined;
-        }
-
-        const normalizedPayload = encodedPayload
-            .replace(/-/g, "+")
-            .replace(/_/g, "/");
-
-        const paddingLength =
-            (4 - (normalizedPayload.length % 4)) % 4;
-
-        const paddedPayload =
-            normalizedPayload + "=".repeat(paddingLength);
-
-        const payload = JSON.parse(atob(paddedPayload));
-
-        return typeof payload.role === "string"
-            ? payload.role
-            : undefined;
-    } catch {
-        return undefined;
-    }
-}
 
 export default function LoginPage() {
-    const router = useRouter();
+  const router = useRouter();
 
-    const [email, setEmail] = useState("");
-    const [password, setPassword] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
 
-    const [errors, setErrors] = useState<FormErrors>({});
-    const [responseMessage, setResponseMessage] = useState("");
-    const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-    const handleSubmit = async (
-        event: FormEvent<HTMLFormElement>
-    ) => {
-        event.preventDefault();
+  const handleLogin = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
 
-        setErrors({});
-        setResponseMessage("");
+    setError("");
+    setLoading(true);
 
-        const validationResult = loginSchema.safeParse({
-            email,
-            password,
-        });
-
-        if (!validationResult.success) {
-            const fieldErrors =
-                validationResult.error.flatten().fieldErrors;
-
-            setErrors({
-                email: fieldErrors.email?.[0],
-                password: fieldErrors.password?.[0],
-            });
-
-            return;
+    try {
+      const response = await axios.post(
+        "http://127.0.0.1:3000/api/auth/login",
+        {
+          email,
+          password,
         }
+      );
 
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+      const { accessToken, refreshToken } = response.data;
 
-        if (!apiUrl) {
-            setResponseMessage(
-                "The login service is currently unavailable."
-            );
-            return;
-        }
+      // Save tokens
+      localStorage.setItem("accessToken", accessToken);
+      localStorage.setItem("refreshToken", refreshToken);
 
-        try {
-            setIsLoading(true);
+      // Decode JWT payload
+      const payload = JSON.parse(
+        atob(accessToken.split(".")[1])
+      );
 
-            const response = await axios.post(
-                `${apiUrl}/auth/login`,
-                validationResult.data
-            );
+      console.log(payload); //debugggggggggggggggggg
 
-            const { accessToken, refreshToken } = response.data;
+      const role = payload.role;
 
-            if (!accessToken) {
-                setResponseMessage(
-                    "Login could not be completed. Please try again."
-                );
-                return;
-            }
+      // Redirect according to role
+      if (role === "Admin") {
+        router.push("/admin");
+      } else if (role === "Manager") {
+        router.push("/manager");
+      } else if (role === "Customer") {
+        router.push("/dashboard");
+      } else {
+        setError("Invalid user role.");
+      }
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        console.log("hereeeeeeeeeeeeeeeeee"); //debugggggggggggggggg
+        setError(
+          error.response?.data?.message ||
+            "Invalid email or password."
+        );
+      } else {
+        setError("Something went wrong. Please try again.");
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
 
-            localStorage.setItem("accessToken", accessToken);
+  return (
+    <main className="flex min-h-screen items-center justify-center bg-slate-100 px-4">
+      <div className="w-full max-w-md">
 
-            if (refreshToken) {
-                localStorage.setItem(
-                    "refreshToken",
-                    refreshToken
-                );
-            }
+        {/* Logo */}
+        <div className="mb-8 text-center">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-600 text-xl font-bold text-white shadow-lg shadow-blue-200">
+            S
+          </div>
 
-            const receivedRole =
-                response.data.user?.role ??
-                response.data.role ??
-                getRoleFromToken(accessToken);
+          <h1 className="mt-4 text-2xl font-bold text-slate-900">
+            SupportDesk
+          </h1>
 
-            const role = receivedRole?.toLowerCase();
+          <p className="mt-2 text-sm text-slate-500">
+            Sign in to your account
+          </p>
+        </div>
 
-            if (role === "admin") {
-                router.push("/admin");
-            } else if (role === "manager") {
-                router.push("/manager");
-            } else if (role === "customer") {
-                router.push("/dashboard");
-            } else {
-                router.push("/tickets");
-            }
+        {/* Login Card */}
+        <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-xl shadow-slate-200/50">
+          <form
+            onSubmit={handleLogin}
+            className="space-y-5"
+          >
 
-            router.refresh();
-        } catch (error) {
-            if (
-                axios.isAxiosError(error) &&
-                (error.response?.status === 400 ||
-                    error.response?.status === 401)
-            ) {
-                setResponseMessage(
-                    "The email or password you entered is incorrect."
-                );
-            } else if (
-                axios.isAxiosError(error) &&
-                !error.response
-            ) {
-                setResponseMessage(
-                    "Unable to connect to the server. Please try again."
-                );
-            } else {
-                setResponseMessage(
-                    "We couldn’t sign you in. Please try again later."
-                );
-            }
-        } finally {
-            setIsLoading(false);
-        }
-    };
+            {/* Email */}
+            <div>
+              <label
+                htmlFor="email"
+                className="mb-2 block text-sm font-medium text-slate-700"
+              >
+                Email
+              </label>
 
-    return (
-        <main className="relative min-h-screen overflow-hidden bg-[#020203] text-white">
-            {/* Subtle purple glow */}
-            <div
-                aria-hidden="true"
-                className="pointer-events-none absolute inset-0"
-                style={{
-                    background:
-                        "radial-gradient(circle at 24% 48%, rgba(109, 40, 217, 0.08), transparent 25%)",
-                }}
-            />
+              <input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Enter your email"
+                required
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-100"
+              />
+            </div>
 
-            {/* Navigation */}
-            <header className="relative z-10">
-                <nav className="mx-auto flex max-w-6xl items-center justify-center gap-8 px-6 py-6 sm:gap-10">
-                    <Link
-                        href="/landing"
-                        className="text-xs font-medium uppercase text-zinc-400 transition hover:text-white"
-                    >
-                        Home
-                    </Link>
+            {/* Password */}
+            <div>
+              <div className="mb-2 flex items-center justify-between">
+                <label
+                  htmlFor="password"
+                  className="text-sm font-medium text-slate-700"
+                >
+                  Password
+                </label>
 
-                    <Link
-                        href="/tickets"
-                        className="text-xs font-medium uppercase text-zinc-400 transition hover:text-white"
-                    >
-                        Tickets
-                    </Link>
+                <button
+                  type="button"
+                  className="text-xs font-medium text-blue-600 hover:text-blue-700"
+                >
+                  Forgot password?
+                </button>
+              </div>
 
-                    <Link
-                        href="/profile"
-                        className="text-xs font-medium uppercase text-zinc-400 transition hover:text-white"
-                    >
-                        Profile
-                    </Link>
+              <input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Enter your password"
+                required
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-100"
+              />
+            </div>
 
-                    <Link
-                        href="/register"
-                        className="rounded-full bg-white px-8 py-3 text-xs font-semibold uppercase text-black transition hover:bg-zinc-200"
-                    >
-                        Register
-                    </Link>
-                </nav>
-            </header>
+            {/* Error */}
+            {error && (
+              <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
+                {error}
+              </div>
+            )}
 
-            {/* Left-side login content */}
-            <section className="relative z-10 mx-auto w-full max-w-6xl px-6 pb-20 pt-28 lg:px-2">
-                <div className="w-full max-w-[335px]">
-                    <div className="flex h-[34px] w-[164px] items-center justify-center rounded-full border border-purple-500 shadow-[0_0_25px_rgba(147,51,234,0.15)]">
-                        <span className="text-[11px] font-semibold uppercase text-zinc-200">
-                            Sign In
-                        </span>
-                    </div>
+            {/* Login Button */}
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full rounded-xl bg-blue-600 py-3.5 text-sm font-semibold text-white shadow-lg shadow-blue-200 transition hover:bg-blue-700 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {loading ? "Signing in..." : "Sign In"}
+            </button>
+          </form>
 
-                    <h1 className="mt-6 text-[42px] font-bold leading-none tracking-tight text-white">
-                        Welcome Back!
-                    </h1>
+          {/* Register */}
+          <p className="mt-6 text-center text-sm text-slate-500">
+            Don't have an account?{" "}
+            <button
+              type="button"
+              className="font-medium text-blue-600 hover:text-blue-700"
+            >
+              Create an account
+            </button>
+          </p>
+        </div>
 
-                    <p className="mt-6 text-[19px] text-zinc-400">
-                        Get back to your profile
-                    </p>
-
-                    <form
-                        onSubmit={handleSubmit}
-                        noValidate
-                        className="mt-7"
-                    >
-                        <div>
-                            <label
-                                htmlFor="email"
-                                className="sr-only"
-                            >
-                                Email Address
-                            </label>
-
-                            <input
-                                id="email"
-                                type="email"
-                                value={email}
-                                onChange={(event) => {
-                                    setEmail(event.target.value);
-
-                                    setErrors((currentErrors) => ({
-                                        ...currentErrors,
-                                        email: undefined,
-                                    }));
-
-                                    setResponseMessage("");
-                                }}
-                                placeholder="Email Address"
-                                autoComplete="email"
-                                aria-invalid={Boolean(errors.email)}
-                                className={`login-input h-10 w-full rounded-full border bg-[#0b0a13] px-6 text-xs text-white outline-none transition placeholder:text-zinc-400 ${
-                                    errors.email
-                                        ? "border-red-500"
-                                        : "border-zinc-300 focus:border-purple-500"
-                                }`}
-                            />
-
-                            {errors.email && (
-                                <p className="mt-2 px-3 text-xs text-red-400">
-                                    {errors.email}
-                                </p>
-                            )}
-                        </div>
-
-                        <div className="mt-4">
-                            <label
-                                htmlFor="password"
-                                className="sr-only"
-                            >
-                                Password
-                            </label>
-
-                            <input
-                                id="password"
-                                type="password"
-                                value={password}
-                                onChange={(event) => {
-                                    setPassword(event.target.value);
-
-                                    setErrors((currentErrors) => ({
-                                        ...currentErrors,
-                                        password: undefined,
-                                    }));
-
-                                    setResponseMessage("");
-                                }}
-                                placeholder="Password"
-                                autoComplete="current-password"
-                                aria-invalid={Boolean(errors.password)}
-                                className={`login-input h-10 w-full rounded-full border bg-[#0b0a13] px-6 text-xs text-white outline-none transition placeholder:text-zinc-400 ${
-                                    errors.password
-                                        ? "border-red-500"
-                                        : "border-zinc-300 focus:border-purple-500"
-                                }`}
-                            />
-
-                            {errors.password && (
-                                <p className="mt-2 px-3 text-xs text-red-400">
-                                    {errors.password}
-                                </p>
-                            )}
-                        </div>
-
-                        <div className="mt-3 flex justify-end">
-                            <Link
-                                href="/forgot-password"
-                                className="text-[13px] font-semibold text-purple-500 transition hover:text-purple-400"
-                            >
-                                Forgot Password?
-                            </Link>
-                        </div>
-
-                        {responseMessage && (
-                            <p className="mt-3 text-xs leading-5 text-red-400">
-                                {responseMessage}
-                            </p>
-                        )}
-
-                       <button
-    type="submit"
-    disabled={isLoading}
-    style={{ borderRadius: "9999px" }}
-    className="mt-5 h-11 w-full overflow-hidden bg-gradient-to-r from-violet-600 to-purple-500 text-xs font-medium uppercase text-white transition hover:from-violet-500 hover:to-purple-400 disabled:cursor-not-allowed disabled:opacity-60"
->
-    {isLoading ? "Logging in..." : "Login"}
-</button>
-                    </form>
-                </div>
-            </section>
-
-            {/* Keep browser autofill dark */}
-            <style>{`
-                .login-input:-webkit-autofill,
-                .login-input:-webkit-autofill:hover,
-                .login-input:-webkit-autofill:focus,
-                .login-input:-webkit-autofill:active {
-                    -webkit-text-fill-color: #ffffff !important;
-                    -webkit-box-shadow: 0 0 0 1000px #0b0a13
-                        inset !important;
-                    box-shadow: 0 0 0 1000px #0b0a13 inset !important;
-                    caret-color: #ffffff;
-                }
-            `}</style>
-        </main>
-    );
+        <p className="mt-6 text-center text-xs text-slate-400">
+          © 2026 SupportDesk
+        </p>
+      </div>
+    </main>
+  );
 }
