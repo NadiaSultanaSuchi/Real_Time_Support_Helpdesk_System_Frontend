@@ -22,14 +22,14 @@ import {
     SheetTitle,
 } from "@/components/ui/sheet";
 
-function statusColor(status) {
+function statusColor(status: string) {
     if (status === "Resolved") return "bg-green-100 text-green-700";
     if (status === "InProgress") return "bg-amber-100 text-amber-700";
     if (status === "Closed") return "bg-slate-200 text-slate-600";
     return "bg-blue-100 text-blue-700";
 }
 
-function priorityColor(priority) {
+function priorityColor(priority: string) {
     if (priority === "Urgent") return "bg-red-100 text-red-700";
     if (priority === "High") return "bg-orange-100 text-orange-700";
     if (priority === "Medium") return "bg-amber-100 text-amber-700";
@@ -44,24 +44,24 @@ export default function AssignedTicketsPage() {
     const searchQuery = searchParams.get("q")?.toLowerCase() ?? "";
 
     const [totalAssigned, setTotalAssigned] = useState(0);
-    const [byStatus, setByStatus] = useState({});
-    const [tickets, setTickets] = useState([]);
-    const [team, setTeam] = useState([]);
+    const [byStatus, setByStatus] = useState<any>({});
+    const [tickets, setTickets] = useState<any[]>([]);
+    const [team, setTeam] = useState<any[]>([]);
 
     const [loading, setLoading] = useState(true);
-    const [errorMessage, setErrorMessage] = useState(null);
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
     const [sheetOpen, setSheetOpen] = useState(false);
-    const [selectedTicket, setSelectedTicket] = useState(null);
+    const [selectedTicket, setSelectedTicket] = useState<any>(null);
     const [detailLoading, setDetailLoading] = useState(false);
     const [saving, setSaving] = useState(false);
     const [pendingStatus, setPendingStatus] = useState("");
-    const [pendingAssigneeId, setPendingAssigneeId] = useState(null);
+    const [pendingAssigneeId, setPendingAssigneeId] = useState<number | null>(null);
 
     const [transferQuery, setTransferQuery] = useState("");
     const [showSuggestions, setShowSuggestions] = useState(false);
 
-    const [comments, setComments] = useState([]);
+    const [comments, setComments] = useState<any[]>([]);
     const [commentText, setCommentText] = useState("");
     const [postingComment, setPostingComment] = useState(false);
 
@@ -78,7 +78,7 @@ export default function AssignedTicketsPage() {
             setTickets(response.data.tickets);
             setErrorMessage(null);
         }
-        catch (error) {
+        catch (error: any) {
             if (error.response) {
                 setErrorMessage(error.response.data?.error || "Could not load assigned tickets");
             } else {
@@ -98,7 +98,7 @@ export default function AssignedTicketsPage() {
         }).then((res) => setTeam(res.data)).catch(() => {});
     }, [])
 
-    const handleRowClick = async (ticketId) => {
+    const handleRowClick = async (ticketId: number) => {
         setSheetOpen(true);
         setDetailLoading(true);
         setSelectedTicket(null);
@@ -120,7 +120,7 @@ export default function AssignedTicketsPage() {
             });
             setComments(commentsRes.data);
         }
-        catch (error) {
+        catch (error: any) {
             alert(error.response?.data?.error || "Could not load ticket details");
             setSheetOpen(false);
         }
@@ -129,7 +129,7 @@ export default function AssignedTicketsPage() {
         }
     }
 
-    const handlePickTeammate = (member) => {
+    const handlePickTeammate = (member: any) => {
         setPendingAssigneeId(member.id);
         setTransferQuery(member.name || member.email);
         setShowSuggestions(false);
@@ -162,7 +162,7 @@ export default function AssignedTicketsPage() {
             await loadAssignedTickets();
             setSheetOpen(false);
         }
-        catch (error) {
+        catch (error: any) {
             alert(error.response?.data?.error || "Could not save changes");
         }
         finally {
@@ -183,7 +183,7 @@ export default function AssignedTicketsPage() {
             setComments((prev) => [...prev, response.data]);
             setCommentText("");
         }
-        catch (error) {
+        catch (error: any) {
             alert(error.response?.data?.error || "Could not post comment");
         }
         finally {
