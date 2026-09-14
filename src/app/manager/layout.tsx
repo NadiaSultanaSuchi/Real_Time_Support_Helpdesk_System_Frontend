@@ -5,8 +5,13 @@ import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { jwtDecode } from "jwt-decode";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
+import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
+import AssistantPanel from "@/components/AssistantPanel";
 
-export default function ManagerLayout({ children }) {
+export default function ManagerLayout({ children }: { children: React.ReactNode }) {
 
     const router = useRouter();
     const pathname = usePathname();
@@ -16,32 +21,29 @@ export default function ManagerLayout({ children }) {
         name: "",
         email: "",
     })
+    const [searchText, setSearchText] = useState("");
 
     useEffect(() => {
 
         const token = localStorage.getItem("accessToken");
 
         if (!token) {
-            console.log("no token, redirecting");
             router.push("/login");
             return;
         }
 
         try {
-            const decoded = jwtDecode(token);
-            console.log(decoded);
+            const decoded = jwtDecode<{ sub: number; email: string; role: string }>(token);
 
             if (decoded.role != "Manager") {
-                console.log("not a manager, redirecting");
                 router.push("/login");
                 return;
             }
 
-            setCurrentUser({ name: decoded.name, email: decoded.email });
+            setCurrentUser({ name: decoded.email, email: decoded.email });
             setAuthorized(true);
         }
         catch (error) {
-            console.log(error);
             router.push("/login");
         }
 
@@ -55,8 +57,14 @@ export default function ManagerLayout({ children }) {
         { href: "/manager", label: "Dashboard" },
         { href: "/manager/assigned", label: "Assigned Tickets" },
         { href: "/manager/team", label: "Team Management" },
-        { href: "/manager/customers", label: "Customers" },
+        { href: "/manager/customers", label: "Customers" }
     ];
+
+    const handleSearch = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === "Enter" && searchText.trim()) {
+            router.push(`/manager/assigned?q=${encodeURIComponent(searchText.trim())}`);
+        }
+    }
 
     return (
         <div className="min-h-screen bg-slate-50">
@@ -70,44 +78,53 @@ export default function ManagerLayout({ children }) {
                     <h1 className="ml-3 font-semibold">Support Ticket System</h1>
                 </div>
 
-                <nav className="flex-1 px-4 py-6">
-
+                <nav className="flex-1 px-4 py-6 space-y-1">
                     {navItems.map((item) => (
-                        <div key={item.href}>
-                            <Link
-                                href={item.href}
-                                className={
-                                    pathname === item.href
-                                        ? "flex items-center gap-3 rounded-xl bg-blue-600 px-3 py-3 text-sm"
-                                        : "flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-slate-300"
-                                }
-                            >
-                                {item.label}
-                            </Link><br />
-                        </div>
+                        <Link
+                            key={item.href}
+                            href={item.href}
+                            className={cn(
+                                "flex w-full items-center rounded-xl px-3 py-3 text-sm transition-colors",
+                                pathname === item.href
+                                    ? "bg-blue-600 text-white"
+                                    : "text-slate-300 hover:bg-slate-800 hover:text-white"
+                            )}
+                        >
+                            {item.label}
+                        </Link>
                     ))}
-
                 </nav>
 
-                <div className="border-t border-slate-800 p-4">
-                    <button
+                <Separator className="bg-slate-800" />
+
+                <div className="p-4">
+                    <Button
+                        variant="ghost"
+                        className="w-full justify-start text-slate-300 hover:bg-slate-800 hover:text-white"
                         onClick={() => {
                             localStorage.removeItem("accessToken");
                             localStorage.removeItem("refreshToken");
-                            console.log("logging out");
                             router.push("/login");
                         }}
-                        className="text-sm text-slate-300"
                     >
                         Logout
-                    </button>
+                    </Button>
                 </div>
 
             </aside>
 
             <div className="ml-64">
 
-                <header className="sticky top-0 z-10 flex h-20 items-center justify-end border-b bg-white px-8">
+                <header className="sticky top-0 z-10 flex h-20 items-center justify-between border-b bg-white px-8">
+
+                    <Input
+                        type="text"
+                        placeholder="Search tickets, users, or keywords..."
+                        className="max-w-md"
+                        value={searchText}
+                        onChange={(e) => setSearchText(e.target.value)}
+                        onKeyDown={handleSearch}
+                    />
 
                     <div className="flex items-center gap-3">
                         <Avatar>
@@ -123,6 +140,8 @@ export default function ManagerLayout({ children }) {
                 </main>
 
             </div>
+
+            <AssistantPanel />
 
         </div>
     );
