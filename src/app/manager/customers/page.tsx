@@ -20,7 +20,7 @@ function statusColor(status) {
     if (status === "Resolved") return "bg-green-100 text-green-700";
     if (status === "InProgress") return "bg-amber-100 text-amber-700";
     if (status === "Closed") return "bg-slate-200 text-slate-600";
-    return "bg-blue-100 text-blue-700"; // Open
+    return "bg-blue-100 text-blue-700";
 }
 
 function averageRating(tickets) {
@@ -30,12 +30,11 @@ function averageRating(tickets) {
     return Number((sum / rated.length).toFixed(1));
 }
 
-// Simple, rule-based flagging — NOT real AI/ML.
 function checkSuspicious(tickets) {
-    const reasons = [];
+    const signals = [];
 
     if (tickets.length >= 5) {
-        reasons.push("High ticket volume (5+)");
+        signals.push("High ticket volume (5+)");
     }
 
     const titleCounts = {};
@@ -44,7 +43,7 @@ function checkSuspicious(tickets) {
     });
     const hasDuplicateTitle = Object.values(titleCounts).some((count) => count >= 2);
     if (hasDuplicateTitle) {
-        reasons.push("Duplicate ticket titles");
+        signals.push("Duplicate ticket titles");
     }
 
     const sortedDates = tickets
@@ -54,12 +53,12 @@ function checkSuspicious(tickets) {
     for (let i = 1; i < sortedDates.length; i++) {
         const gapHours = (sortedDates[i] - sortedDates[i - 1]) / (1000 * 60 * 60);
         if (gapHours < 1) {
-            reasons.push("Multiple tickets within 1 hour");
+            signals.push("Multiple tickets within 1 hour");
             break;
         }
     }
 
-    return reasons;
+    return signals.length >= 2 ? signals : [];
 }
 
 export default function CustomersPage() {
@@ -67,15 +66,10 @@ export default function CustomersPage() {
     const [customers, setCustomers] = useState([]);
     const [tickets, setTickets] = useState([]);
     const [selectedId, setSelectedId] = useState(null);
+    const [searchQuery, setSearchQuery] = useState("");
 
     const [loading, setLoading] = useState(true);
     const [errorMessage, setErrorMessage] = useState(null);
-
-    const [openNotesTicketId, setOpenNotesTicketId] = useState(null);
-    const [comments, setComments] = useState([]);
-    const [commentsLoading, setCommentsLoading] = useState(false);
-    const [commentText, setCommentText] = useState("");
-    const [postingComment, setPostingComment] = useState(false);
 
     const token = typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
 
@@ -115,69 +109,29 @@ export default function CustomersPage() {
         return tickets.filter((t) => t.customer?.id === customerId);
     }
 
-    const handleToggleNotes = async (ticketId) => {
-        if (openNotesTicketId === ticketId) {
-            setOpenNotesTicketId(null);
-            return;
-        }
-
-        setOpenNotesTicketId(ticketId);
-        setCommentText("");
-        setCommentsLoading(true);
-        try {
-            const response = await axios.get(`http://localhost:3000/api/tickets/${ticketId}/comments`, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
-            setComments(response.data);
-        }
-        catch (error) {
-            alert(error.response?.data?.error || "Could not load notes");
-            setOpenNotesTicketId(null);
-        }
-        finally {
-            setCommentsLoading(false);
-        }
-    }
-
-    const handlePostComment = async () => {
-        if (!commentText.trim()) return;
-
-        setPostingComment(true);
-        try {
-            const response = await axios.post(
-                `http://localhost:3000/api/tickets/${openNotesTicketId}/comments`,
-                { content: commentText },
-                { headers: { Authorization: `Bearer ${token}` } }
-            );
-            setComments((prev) => [...prev, response.data]);
-            setCommentText("");
-        }
-        catch (error) {
-            alert(error.response?.data?.error || "Could not post note");
-        }
-        finally {
-            setPostingComment(false);
-        }
+    const handleSelectCustomer = (customerId) => {
+        console.log("clicked customer id:", customerId);
+        setSelectedId(customerId);
     }
 
     const handleReportCustomer = async (customer, reasons) => {
-    const extra = window.prompt(
-        `Report ${customer.name || customer.email} to Admin?\n\nAuto-detected: ${reasons.join(", ")}\n\nAdd a note (optional):`
-    );
-    if (extra === null) return; // cancelled
-
-    try {
-        await axios.patch(
-            `http://localhost:3000/api/users/customers/${customer.id}/report`,
-            { reason: `${reasons.join(", ")}${extra ? " — " + extra : ""}` },
-            { headers: { Authorization: `Bearer ${token}` } }
+        const extra = window.prompt(
+            `Report ${customer.name || customer.email} to Admin?\n\nAuto-detected: ${reasons.join(", ")}\n\nAdd a note (optional):`
         );
-        alert("Reported to Admin.");
+        if (extra === null) return;
+
+        try {
+            await axios.patch(
+                `http://localhost:3000/api/users/customers/${customer.id}/report`,
+                { reason: `${reasons.join(", ")}${extra ? " — " + extra : ""}` },
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
+            alert("Reported to Admin.");
+        }
+        catch (error) {
+            alert(error.response?.data?.error || "Could not send report");
+        }
     }
-    catch (error) {
-        alert(error.response?.data?.error || "Could not send report");
-    }
-}
 
     if (loading) {
         return <p>Loading...</p>
@@ -188,6 +142,17 @@ export default function CustomersPage() {
     }
 
     const selectedCustomer = customers.find((c) => c.id === selectedId);
+
+    const filteredCustomers = customers.filter((c) => {
+        const query = searchQuery.toLowerCase().trim();
+        if (query === "") return true;
+
+        return (
+            String(c.id).includes(query) ||
+            (c.name || "").toLowerCase().includes(query) ||
+            c.email.toLowerCase().includes(query)
+        );
+    });
 
     const suspiciousCount = customers.filter(
         (c) => checkSuspicious(ticketsFor(c.id)).length > 0
@@ -211,7 +176,7 @@ export default function CustomersPage() {
                             <CardTitle>Fraud Check Overview</CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <ResponsiveContainer width="100%" height={140}>
+                            <ResponsiveContainer width={320} height={140}>
                                 <BarChart data={fraudCheckData} layout="vertical">
                                     <CartesianGrid strokeDasharray="3 3" horizontal={false} />
                                     <XAxis type="number" allowDecimals={false} />
@@ -235,11 +200,17 @@ export default function CustomersPage() {
                 <Card className="col-span-2">
                     <CardHeader>
                         <CardTitle>All Customers</CardTitle>
+                        <Input
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            placeholder="Search by id, name or email..."
+                            className="mt-2 max-w-sm"
+                        />
                     </CardHeader>
                     <CardContent>
 
-                        {customers.length === 0 ? (
-                            <p className="text-sm text-slate-500">No customers yet</p>
+                        {filteredCustomers.length === 0 ? (
+                            <p className="text-sm text-slate-500">No matching customers</p>
                         ) : (
                             <Table>
                                 <TableHeader>
@@ -253,24 +224,24 @@ export default function CustomersPage() {
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {customers.map((customer) => {
+                                    {filteredCustomers.map((customer) => {
                                         const custTickets = ticketsFor(customer.id);
                                         const avg = averageRating(custTickets);
                                         const suspiciousReasons = checkSuspicious(custTickets);
 
                                         return (
                                             <TableRow key={customer.id}>
-                                                <TableCell>#{customer.id}</TableCell>
+                                                <TableCell>{customer.id}</TableCell>
                                                 <TableCell>{customer.name || "—"}</TableCell>
                                                 <TableCell>{customer.email}</TableCell>
                                                 <TableCell>
-                                                    <Button
-                                                        variant="link"
-                                                        className="p-0 h-auto"
-                                                        onClick={() => setSelectedId(customer.id)}
+                                                    <button
+                                                        type="button"
+                                                        className="text-blue-600 underline hover:text-blue-800"
+                                                        onClick={() => handleSelectCustomer(customer.id)}
                                                     >
                                                         {custTickets.length} ticket(s)
-                                                    </Button>
+                                                    </button>
                                                 </TableCell>
                                                 <TableCell>
                                                     {avg === null ? (
@@ -279,28 +250,29 @@ export default function CustomersPage() {
                                                         <span>⭐ {avg} / 5</span>
                                                     )}
                                                 </TableCell>
-                                               <TableCell>
-    {suspiciousReasons.length === 0 ? (
-        <span className="text-slate-300">—</span>
-    ) : (
-        <div className="flex items-center gap-2">
-            <Badge
-                className="bg-red-100 text-red-700"
-                title={suspiciousReasons.join(", ")}
-            >
-                ⚠ Suspicious
-            </Badge>
-            <Button
-                variant="outline"
-                size="sm"
-                className="h-6 px-2 text-xs"
-                onClick={() => handleReportCustomer(customer, suspiciousReasons)}
-            >
-                Report
-            </Button>
-        </div>
-    )}
-</TableCell>
+                                                <TableCell>
+                                                    {suspiciousReasons.length === 0 ? (
+                                                        <span className="text-slate-300">—</span>
+                                                    ) : (
+                                                        <div className="flex items-center gap-2">
+                                                            <Badge
+                                                                className="bg-red-100 text-red-700"
+                                                                title={suspiciousReasons.join(", ")}
+                                                            >
+                                                                ⚠ Suspicious
+                                                            </Badge>
+                                                            <Button
+                                                                type="button"
+                                                                variant="outline"
+                                                                size="sm"
+                                                                className="h-6 px-2 text-xs"
+                                                                onClick={() => handleReportCustomer(customer, suspiciousReasons)}
+                                                            >
+                                                                Report
+                                                            </Button>
+                                                        </div>
+                                                    )}
+                                                </TableCell>
                                             </TableRow>
                                         );
                                     })}
@@ -320,7 +292,7 @@ export default function CustomersPage() {
                     <CardContent>
 
                         {!selectedCustomer ? (
-                            <p className="text-sm text-slate-500">Click ticket ...see details.</p>
+                            <p className="text-sm text-slate-500">No customer selected.</p>
                         ) : (
                             <>
                                 {checkSuspicious(ticketsFor(selectedCustomer.id)).length > 0 && (
@@ -345,50 +317,6 @@ export default function CustomersPage() {
                                                 <span className="ml-2 text-sm text-slate-500">
                                                     {ticket.rating != null ? `⭐ ${ticket.rating}/5` : "Not rated"}
                                                 </span>
-
-                                                <div>
-                                                    <button
-                                                        type="button"
-                                                        className="mt-1 text-xs text-blue-600 hover:underline"
-                                                        onClick={() => handleToggleNotes(ticket.id)}
-                                                    >
-                                                        {openNotesTicketId === ticket.id ? "Hide notes" : "View / add notes"}
-                                                    </button>
-                                                </div>
-
-                                                {openNotesTicketId === ticket.id && (
-                                                    <div className="mt-2 rounded-md border bg-slate-50 p-2">
-                                                        {commentsLoading ? (
-                                                            <p className="text-xs text-slate-400">Loading notes...</p>
-                                                        ) : (
-                                                            <div className="space-y-2 max-h-[140px] overflow-y-auto">
-                                                                {comments.length === 0 ? (
-                                                                    <p className="text-xs text-slate-400">No notes yet</p>
-                                                                ) : (
-                                                                    comments.map((c) => (
-                                                                        <div key={c.id} className="text-xs border-b border-slate-200 pb-1">
-                                                                            <p className="font-medium text-slate-700">{c.author?.name || c.author?.email}</p>
-                                                                            <p className="text-slate-600">{c.content}</p>
-                                                                        </div>
-                                                                    ))
-                                                                )}
-                                                            </div>
-                                                        )}
-
-                                                        <div className="mt-2 flex gap-2">
-                                                            <Input
-                                                                value={commentText}
-                                                                onChange={(e) => setCommentText(e.target.value)}
-                                                                placeholder="Leave a note..."
-                                                                className="h-8 text-xs"
-                                                                onKeyDown={(e) => { if (e.key === "Enter") handlePostComment(); }}
-                                                            />
-                                                            <Button size="sm" onClick={handlePostComment} disabled={postingComment}>
-                                                                Post
-                                                            </Button>
-                                                        </div>
-                                                    </div>
-                                                )}
                                             </div>
                                         ))}
                                     </div>

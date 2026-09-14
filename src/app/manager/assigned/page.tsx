@@ -2,7 +2,6 @@
 
 import axios from 'axios';
 import { useState, useEffect } from 'react';
-import { useSearchParams } from 'next/navigation';
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -22,46 +21,44 @@ import {
     SheetTitle,
 } from "@/components/ui/sheet";
 
-function statusColor(status: string) {
+function statusColor(status) {
     if (status === "Resolved") return "bg-green-100 text-green-700";
     if (status === "InProgress") return "bg-amber-100 text-amber-700";
     if (status === "Closed") return "bg-slate-200 text-slate-600";
-    return "bg-blue-100 text-blue-700";
+    return "bg-blue-100 text-blue-700"; // Open
 }
 
-function priorityColor(priority: string) {
+function priorityColor(priority) {
     if (priority === "Urgent") return "bg-red-100 text-red-700";
     if (priority === "High") return "bg-orange-100 text-orange-700";
     if (priority === "Medium") return "bg-amber-100 text-amber-700";
-    return "bg-slate-100 text-slate-600";
+    return "bg-slate-100 text-slate-600"; // Low
 }
 
 const STATUS_OPTIONS = ["Open", "InProgress", "Resolved", "Closed"];
 
 export default function AssignedTicketsPage() {
 
-    const searchParams = useSearchParams();
-    const searchQuery = searchParams.get("q")?.toLowerCase() ?? "";
-
     const [totalAssigned, setTotalAssigned] = useState(0);
-    const [byStatus, setByStatus] = useState<any>({});
-    const [tickets, setTickets] = useState<any[]>([]);
-    const [team, setTeam] = useState<any[]>([]);
+    const [byStatus, setByStatus] = useState({});
+    const [tickets, setTickets] = useState([]);
+    const [team, setTeam] = useState([]);
+    const [searchQuery, setSearchQuery] = useState("");
 
     const [loading, setLoading] = useState(true);
-    const [errorMessage, setErrorMessage] = useState<string | null>(null);
+    const [errorMessage, setErrorMessage] = useState(null);
 
     const [sheetOpen, setSheetOpen] = useState(false);
-    const [selectedTicket, setSelectedTicket] = useState<any>(null);
+    const [selectedTicket, setSelectedTicket] = useState(null);
     const [detailLoading, setDetailLoading] = useState(false);
     const [saving, setSaving] = useState(false);
     const [pendingStatus, setPendingStatus] = useState("");
-    const [pendingAssigneeId, setPendingAssigneeId] = useState<number | null>(null);
+    const [pendingAssigneeId, setPendingAssigneeId] = useState(null);
 
     const [transferQuery, setTransferQuery] = useState("");
     const [showSuggestions, setShowSuggestions] = useState(false);
 
-    const [comments, setComments] = useState<any[]>([]);
+    const [comments, setComments] = useState([]);
     const [commentText, setCommentText] = useState("");
     const [postingComment, setPostingComment] = useState(false);
 
@@ -78,7 +75,7 @@ export default function AssignedTicketsPage() {
             setTickets(response.data.tickets);
             setErrorMessage(null);
         }
-        catch (error: any) {
+        catch (error) {
             if (error.response) {
                 setErrorMessage(error.response.data?.error || "Could not load assigned tickets");
             } else {
@@ -98,7 +95,7 @@ export default function AssignedTicketsPage() {
         }).then((res) => setTeam(res.data)).catch(() => {});
     }, [])
 
-    const handleRowClick = async (ticketId: number) => {
+    const handleRowClick = async (ticketId) => {
         setSheetOpen(true);
         setDetailLoading(true);
         setSelectedTicket(null);
@@ -120,7 +117,7 @@ export default function AssignedTicketsPage() {
             });
             setComments(commentsRes.data);
         }
-        catch (error: any) {
+        catch (error) {
             alert(error.response?.data?.error || "Could not load ticket details");
             setSheetOpen(false);
         }
@@ -129,7 +126,7 @@ export default function AssignedTicketsPage() {
         }
     }
 
-    const handlePickTeammate = (member: any) => {
+    const handlePickTeammate = (member) => {
         setPendingAssigneeId(member.id);
         setTransferQuery(member.name || member.email);
         setShowSuggestions(false);
@@ -162,7 +159,7 @@ export default function AssignedTicketsPage() {
             await loadAssignedTickets();
             setSheetOpen(false);
         }
-        catch (error: any) {
+        catch (error) {
             alert(error.response?.data?.error || "Could not save changes");
         }
         finally {
@@ -183,7 +180,7 @@ export default function AssignedTicketsPage() {
             setComments((prev) => [...prev, response.data]);
             setCommentText("");
         }
-        catch (error: any) {
+        catch (error) {
             alert(error.response?.data?.error || "Could not post comment");
         }
         finally {
@@ -199,17 +196,25 @@ export default function AssignedTicketsPage() {
         return <p className="text-red-600">{errorMessage}</p>
     }
 
+    const filteredTickets = tickets.filter((ticket) => {
+    const query = searchQuery.toLowerCase().trim();
+    if (query === "") return true;
+
+    return (
+        String(ticket.id).includes(query) ||
+        ticket.title.toLowerCase().includes(query) ||
+        (ticket.customer?.name || "").toLowerCase().includes(query) ||
+        (ticket.customer?.email || "").toLowerCase().includes(query) ||
+        ticket.status.toLowerCase().includes(query) ||
+        ticket.priority.toLowerCase().includes(query)
+    );
+});
+
     const filteredTeam = team
         .filter((member) => member.id !== selectedTicket?.assignee?.id)
         .filter((member) =>
             (member.name || member.email).toLowerCase().includes(transferQuery.toLowerCase())
         );
-
-    const filteredTickets = tickets.filter((t) =>
-        !searchQuery ||
-        t.title?.toLowerCase().includes(searchQuery) ||
-        t.customer?.email?.toLowerCase().includes(searchQuery)
-    );
 
     const hasUnsavedChanges =
         selectedTicket &&
@@ -219,12 +224,6 @@ export default function AssignedTicketsPage() {
         <div>
 
             <h1 className="text-3xl font-bold">ASSIGNED TICKETS</h1><br />
-
-            {searchQuery && (
-                <p className="mb-4 text-sm text-slate-500">
-                    Showing results for "{searchQuery}" ({filteredTickets.length} found)
-                </p>
-            )}
 
             <div className="grid grid-cols-4 gap-6">
 
@@ -263,13 +262,17 @@ export default function AssignedTicketsPage() {
             <Card>
                 <CardHeader>
                     <CardTitle>My Tickets</CardTitle>
+                    <Input
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        placeholder="Search by title or customer email..."
+                        className="mt-2 max-w-sm"
+                    />
                 </CardHeader>
                 <CardContent>
 
                     {filteredTickets.length === 0 ? (
-                        <p className="text-sm text-slate-500">
-                            {searchQuery ? "No tickets match your search" : "No assigned tickets"}
-                        </p>
+                        <p className="text-sm text-slate-500">No matching tickets</p>
                     ) : (
                         <Table>
                             <TableHeader>
