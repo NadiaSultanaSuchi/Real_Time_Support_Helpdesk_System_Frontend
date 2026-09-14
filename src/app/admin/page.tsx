@@ -365,7 +365,7 @@ export default function AdminDashboard() {
               </p>
             </a>
 
-            <a
+            {/* <a
               href="/admin/managers/requests"
               className="rounded-xl border border-slate-200 p-4 transition hover:border-blue-200 hover:bg-blue-50"
             >
@@ -383,7 +383,7 @@ export default function AdminDashboard() {
               <p className="mt-2 text-sm font-medium text-slate-900">
                 View Reports
               </p>
-            </a>
+            </a> */}
           </div>
         </div>
 
