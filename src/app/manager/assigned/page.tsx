@@ -2,6 +2,7 @@
 
 import axios from 'axios';
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -25,19 +26,22 @@ function statusColor(status) {
     if (status === "Resolved") return "bg-green-100 text-green-700";
     if (status === "InProgress") return "bg-amber-100 text-amber-700";
     if (status === "Closed") return "bg-slate-200 text-slate-600";
-    return "bg-blue-100 text-blue-700"; // Open
+    return "bg-blue-100 text-blue-700";
 }
 
 function priorityColor(priority) {
     if (priority === "Urgent") return "bg-red-100 text-red-700";
     if (priority === "High") return "bg-orange-100 text-orange-700";
     if (priority === "Medium") return "bg-amber-100 text-amber-700";
-    return "bg-slate-100 text-slate-600"; // Low
+    return "bg-slate-100 text-slate-600";
 }
 
 const STATUS_OPTIONS = ["Open", "InProgress", "Resolved", "Closed"];
 
 export default function AssignedTicketsPage() {
+
+    const searchParams = useSearchParams();
+    const searchQuery = searchParams.get("q")?.toLowerCase() ?? "";
 
     const [totalAssigned, setTotalAssigned] = useState(0);
     const [byStatus, setByStatus] = useState({});
@@ -131,8 +135,6 @@ export default function AssignedTicketsPage() {
         setShowSuggestions(false);
     }
 
-    // One button at the bottom saves everything that changed —
-    // status, and/or a teammate transfer, in one go.
     const handleSaveAll = async () => {
         const statusChanged = pendingStatus !== selectedTicket.status;
         const transferChosen = pendingAssigneeId !== null;
@@ -203,6 +205,12 @@ export default function AssignedTicketsPage() {
             (member.name || member.email).toLowerCase().includes(transferQuery.toLowerCase())
         );
 
+    const filteredTickets = tickets.filter((t) =>
+        !searchQuery ||
+        t.title?.toLowerCase().includes(searchQuery) ||
+        t.customer?.email?.toLowerCase().includes(searchQuery)
+    );
+
     const hasUnsavedChanges =
         selectedTicket &&
         (pendingStatus !== selectedTicket.status || pendingAssigneeId !== null);
@@ -211,6 +219,12 @@ export default function AssignedTicketsPage() {
         <div>
 
             <h1 className="text-3xl font-bold">ASSIGNED TICKETS</h1><br />
+
+            {searchQuery && (
+                <p className="mb-4 text-sm text-slate-500">
+                    Showing results for "{searchQuery}" ({filteredTickets.length} found)
+                </p>
+            )}
 
             <div className="grid grid-cols-4 gap-6">
 
@@ -252,8 +266,10 @@ export default function AssignedTicketsPage() {
                 </CardHeader>
                 <CardContent>
 
-                    {tickets.length === 0 ? (
-                        <p className="text-sm text-slate-500">No assigned tickets</p>
+                    {filteredTickets.length === 0 ? (
+                        <p className="text-sm text-slate-500">
+                            {searchQuery ? "No tickets match your search" : "No assigned tickets"}
+                        </p>
                     ) : (
                         <Table>
                             <TableHeader>
@@ -266,7 +282,7 @@ export default function AssignedTicketsPage() {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {tickets.map((ticket) => (
+                                {filteredTickets.map((ticket) => (
                                     <TableRow
                                         key={ticket.id}
                                         className="cursor-pointer hover:bg-slate-50"
